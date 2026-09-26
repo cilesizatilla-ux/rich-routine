@@ -1,0 +1,1644 @@
+/* Rich Routine — tarayıcı sürümü.
+   Koyu, finansal, sıcak nötr. Aksan tek yerde: pasif gelir. */
+:root {
+  /* Açık tema. Nötrler saf gri değil, hafifçe sıcağa çekilmiş: bu
+     oyun kâğıt ve masa üstü bir şey, ekran griliği ona yabancı.
+     Aksan renkleri açık zeminde kontrast için KOYULAŞTIRILDI —
+     koyu temadaki parlak yeşil beyaz üstünde okunmuyor. */
+  --zemin: #f2ede3;
+  --yuzey: #fffdf8;
+  --yuzey2: #ebe4d7;
+  --cizgi: #d8cfbe;
+  --metin: #2a241c;
+  --sonuk: #6d6355;
+  --aksan: #1e7d47;
+  --uyari: #9a6410;
+  --kayip: #a8382a;
+  --altin: #8a6a10;
+
+  /* Taş ölçüleri TEK KAYNAK: CSS boyutu veriyor, JS pulu taşın alt
+     kenarına yerleştirmek için aynı değeri okuyor. İki yere yazmak,
+     taş büyüdüğünde pulun havada kalması demekti. */
+  --tasDis: 12.5;
+  --tasIc: 9.4;
+  --r: 12px;
+
+  /* TAHTANIN KENDİ PALETİ — "mürekkep ve kâğıt".
+     Oyunun geri kalanı açık temada kalıyor; tahta bir MASA ve masanın
+     rengi mürekkep. Renkler konunun kendi dünyasından: para basımı.
+     Banknot yeşili, pirinç sarısı, belge kâğıdı, baskı mürekkebi. */
+  --t-murekkep:  #0E1512;
+  --t-murekkep2: #1F2E27;
+  --t-kagit:     #EDE7D9;
+  --t-pirinc:    #C8A44D;
+  --t-banknot:   #2E7D52;
+  --t-banknotAc: #4FA97A;
+  --t-yazi:      #33291B;
+
+  /* Masanın üstündeki kâğıt nesneler için: kart yüzeyi, çizgi, yazı.
+     Tahtanın kendi renkleriyle aynı aileden, biraz açık. */
+  --t-yuzey:     #16211C;
+  --t-yuzey2:    #1C2922;
+  --t-cizgi:     rgba(237, 231, 217, .13);
+  --t-metin:     #E4DED0;
+  --t-sonuk:     #8E9A91;
+  --t-kayip:     #D8705F;
+}
+
+* { box-sizing: border-box; }
+
+/* Tarayıcının [hidden] kuralı YAZAR kuralına yeniliyor: .yukleniyor ve
+   .ortu display:grid dediği için hidden=true hiçbir şey yapmıyordu.
+   Yükleme ekranı sayfanın üstünde duruyor, boş modal kutusu bilançonun
+   ortasında bir şerit olarak görünüyor ve sayfa sürekli karartılıyordu. */
+[hidden] { display: none !important; }
+
+/* OYUN EKRANINDAYKEN SAYFA MASA OLUYOR. Tahtayı mürekkebe çevirince
+   altındaki krem zemin ve krem kartlar onunla kavga etmeye başladı.
+   :has() ile seçiyorum çünkü seçim ekranı ile oyun ekranı zaten birbirini
+   dışlıyor (biri hidden); JS'e bir sınıf ekletmek aynı bilgiyi ikinci
+   kez yazmak olurdu ve senkron kalmasını umut etmek gerekirdi.
+   Desteklemeyen tarayıcıda krem kalıyor — bozulmuyor, sadece eski. */
+body:has(#oyun:not([hidden])) { background: var(--t-murekkep); }
+
+/* YAZI RENGİNİ body'YE VERMEK BÜYÜK HATAYDI. Modal body'nin ÇOCUĞU
+   değil kardeşi değil — DOM'da main'in dışında ama yine de body'den
+   renk miras alıyor. Oyun ekranındayken body'ye açık krem yazı rengi
+   verince modalin krem kâğıdına açık krem yazı düştü: varlık adları ve
+   tutarları görünmez oldu. "Motosiklet Kiralama · 1.071.439 ₺"
+   satırının tamamı kayboldu ve satılacak şeyin ne olduğu okunmuyordu.
+   Renk artık ekranın kendisine veriliyor, modal kendi rengini açıkça
+   söylüyor. */
+#oyun { color: var(--t-metin); }
+
+/* Modal mürekkep masanın üstündeki KÂĞIT: zemini de yazısı da kâğıdın.
+   Açıkça yazılı, çünkü miras aldığı yer artık güvenilir değil. */
+.ortu, .modal { color: var(--metin); }
+/* Açılış ekranı krem KALMAK ZORUNDA: acilis/*.png ile aynı görünmesi
+   gerekiyor, yoksa kurulu uygulamada sistem ekranından geçerken zemin
+   rengi atlıyor. */
+#yukleniyor { background: var(--zemin); color: var(--metin); }
+
+body {
+  margin: 0;
+  background: var(--zemin);
+  color: var(--metin);
+  font: 15px/1.45 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+b, .sayi { font-variant-numeric: tabular-nums; }
+
+/* ---------- yükleme ---------- */
+/* AÇILIŞ EKRANI acilis/*.png ile aynı görünmek zorunda: kurulu
+   uygulamada önce sistemin çizdiği o resim, hemen ardından bu geliyor.
+   Zemin, işaretin ölçüsü ve adın yeri tutmazsa geçişte bir zıplama
+   oluyor. Motor ~10 saniye yüklendiği için ekran donuk durmasın diye
+   tahtada bir taş dönüyor — kare kare, oyundaki gibi. */
+.yukleniyor {
+  position: fixed; inset: 0; z-index: 90;
+  background: var(--zemin);
+  transition: opacity .35s ease;
+}
+.yukleniyor.bitti { opacity: 0; pointer-events: none; }
+
+/* KONUMLAR acilis/*.png'DEN ÖLÇÜLDÜ: işaret 112 piksel ve merkezi ekran
+   yüksekliğinin %34'ünde, ad %47'sinde. Ortalayıp geçseydim kurulu
+   uygulamada sistemin çizdiği açılış resminden buna geçerken logo
+   zıplardı — iki ekran arasındaki tek fark yazının belirmesi olsun. */
+.acilisIsaret {
+  position: absolute; left: 50%; top: 34%;
+  transform: translate(-50%, -50%);
+  width: 112px; height: 112px;
+  filter: drop-shadow(0 8px 20px rgba(60, 48, 30, .28));
+}
+/* Tahtada dönen taş: motor ~10 saniye yükleniyor, ekran donuk durmasın.
+   steps(16) kare kare atlatıyor — oyundaki taş gibi. */
+.acilisTas { transform-origin: 256px 256px; animation: tasTuru 6.4s steps(16) infinite; }
+@keyframes tasTuru { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .acilisTas { animation: none; } }
+
+/* SINIF ADLARI AÇILIŞA ÖZEL. Önce .marka/.alt idi; '.alt' oyunun mali
+   tablosunda ve yuvarlak düğmede ZATEN kullanılıyor (tabloSatir alt).
+   Oraya position:absolute sızsaydı bilanço dağılırdı. */
+.acilisAd {
+  position: absolute; left: 0; right: 0; top: 47%;
+  transform: translateY(-50%);
+  text-align: center; font-size: 26px; font-weight: 700; letter-spacing: .02em;
+}
+.acilisDurum {
+  position: absolute; left: 0; right: 0; top: 47%; margin-top: 26px;
+  text-align: center; color: var(--sonuk); font-size: 13px;
+}
+
+main { max-width: 520px; margin: 0 auto; padding: 12px 12px 40px; }
+
+/* ---------- üst ---------- */
+.ust { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.turEtiket { color: var(--sonuk); font-size: 11px; letter-spacing: .12em; }
+.turSayi { font-size: 20px; font-weight: 700; margin-left: 6px; }
+.tuik { color: var(--uyari); font-size: 12px; margin-left: 10px; }
+.metinDugme {
+  background: none; border: 1px solid var(--cizgi); color: var(--sonuk);
+  border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer;
+}
+.metinDugme:hover { color: var(--metin); border-color: var(--sonuk); }
+
+/* ---------- tahta ---------- */
+/* ---------- tahta: dışta kare halka, içte çember ---------- */
+.tahtaKap {
+  position: relative; aspect-ratio: 1; width: 100%;
+  margin-bottom: 14px;
+  perspective: 900px;
+  perspective-origin: 50% 45%;
+}
+.tahta { position: absolute; inset: 0; }
+
+/* Çemberin zemini: iç kulvarın içi. Oyuncu buradan çıkınca dıştaki
+   karelerde ilerliyor ve zemin sönükleşiyor. */
+.icZemin {
+  position: absolute; left: 50%; top: 50%;
+  width: 68%; height: 68%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 38%, #fffdf8 0%, #f0eade 62%, #e6ddcc 100%);
+  border: 1px solid var(--cizgi);
+  box-shadow:
+    inset 0 2px 6px rgba(90, 74, 48, .12),
+    0 2px 10px rgba(70, 56, 34, .10);
+}
+
+.kare {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 9px;
+  border: 1px solid var(--cizgi);
+  background: var(--yuzey);
+  box-shadow:
+    0 2px 0 rgba(90, 74, 48, .16),
+    0 4px 0 rgba(90, 74, 48, .12),
+    0 8px 14px rgba(70, 56, 34, .20),
+    inset 0 1px 0 rgba(255, 255, 255, .75);
+  transition: opacity .3s ease;
+}
+
+/* Dış halka: Hızlı Yol. Kenarda yer bol, ikon ve yazı bir arada. */
+.kare.dis { width: calc(var(--tasDis) * 1%); height: calc(var(--tasDis) * 1%); border-radius: 10px; }
+
+/* İç çember: Kısır Döngü. Yarıçap 28,5'ten 32'ye açıldı ki taşa hem
+   ikon hem tek kelimelik bir etiket sığsın; ortada zar ve düğme için
+   kalan boşluk yine yeterli. */
+.kare.ic { width: calc(var(--tasIc) * 1%); height: calc(var(--tasIc) * 1%); border-radius: 8px; }
+
+.kareYuz {
+  position: absolute; inset: 0;
+  display: grid; place-content: center; gap: 1px;
+  text-align: center; line-height: 1.1;
+  overflow: visible;
+
+  /* İçerik taşın ÜST yarısına toplanıyor: pul alt kenarda duruyor ve
+     tam ortada duran bir etiketi yine kapatıyordu. Alt boşluk pula
+     ayrılmış yer. */
+  padding-bottom: 30%;
+}
+.kareIkon { line-height: 1; }
+.kare.dis .kareIkon { font-size: 15px; }
+.kare.ic .kareIkon { font-size: 11px; }
+.kare.dis .kareAd { font-size: 7.5px; letter-spacing: .01em; white-space: pre-line; }
+.kare.ic .kareAd { font-size: 6.5px; letter-spacing: .01em; white-space: nowrap; }
+
+/* Oyuncu hangi kulvardaysa o vurgulu; diğeri geri çekiliyor. */
+.tahta .kare.dis { opacity: .45; }
+.tahta.disKulvarda .kare.dis { opacity: 1; }
+.tahta.disKulvarda .kare.ic { opacity: .45; }
+.tahta.disKulvarda .icZemin { opacity: .5; }
+
+
+/* ---------- kare renkleri ---------- */
+/* Aile bir bakışta okunsun: aynı işi yapan kareler aynı renkte.
+   AMA HEPSİ ÖNCE KÂĞIT. Önceki renkler pastel şekerdi (#dff0d4,
+   #d9ecf6, #f8ddd4 ...): tek tek hoş, yan yana bir çocuk oyunu.
+   Şimdi hepsi aynı kâğıdın farklı mürekkeple tonlanmış hâli —
+   doygunluk düşük, açıklık aynı. Yan yana geldiklerinde tek bir
+   basılmış deste gibi okunuyorlar, aile farkı yine görünüyor. */
+.kare.MaasGunu, .kare.NakitAkisiGunu {          /* buğday · para giren */
+  background: linear-gradient(160deg, #E2D9B6 0%, #C9BD8F 100%);
+  border-color: #9C8F60;
+}
+.kare.KucukFirsat, .kare.BuyukFirsat, .kare.BuyukYatirim {  /* soluk deniz */
+  background: linear-gradient(160deg, #CFDAD5 0%, #B1C1BA 100%);
+  border-color: #84978D;
+}
+.kare.LuksHarcama, .kare.BeklenmedikGider, .kare.VergiIncelemesi {  /* kil */
+  background: linear-gradient(160deg, #E1C6B9 0%, #C8A697 100%);
+  border-color: #9C7867;
+}
+.kare.PiyasaKarti, .kare.PiyasaSoku {            /* zeytin */
+  background: linear-gradient(160deg, #D9D1AE 0%, #BFB58A 100%);
+  border-color: #94895B;
+}
+.kare.Hayirseverlik, .kare.Baglilik {            /* mürekkep moru */
+  background: linear-gradient(160deg, #D1C9D8 0%, #B4AAC1 100%);
+  border-color: #877D96;
+}
+.kare.CocukSahibiOlmak {                         /* gül */
+  background: linear-gradient(160deg, #DFCACE 0%, #C5AAB1 100%);
+  border-color: #9A7E84;
+}
+.kare.Hayal {                                    /* pirinç — en parlak */
+  background: linear-gradient(160deg, #EFDB9E 0%, #D7BA63 100%);
+  border-color: #A98C33;
+}
+.kare .kareAd { color: var(--t-yazi); }
+
+/* ---------- orta alan: çemberin içi ---------- */
+.orta {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 44%; text-align: center;
+  display: grid; gap: 10px; justify-items: center;
+  z-index: 3;
+}
+.siraMetni { font-size: 12px; color: var(--sonuk); min-height: 16px; }
+.zarlar { display: flex; gap: 10px; min-height: 46px; align-items: center; }
+
+/* ---------- zar ---------- */
+/* Rakam değil nokta. Fildişi bir küp: üst kenarda ışık, altında yan
+   yüzün gölgesi, altında masaya düşen gölge. */
+.zar {
+  width: 42px; height: 42px; border-radius: 10px;
+  background: linear-gradient(155deg, #ffffff 0%, #f3eee2 58%, #ded5c2 100%);
+  box-shadow:
+    0 2px 0 #c8bda6,
+    0 5px 0 #ab9f86,
+    0 10px 16px rgba(70, 56, 34, .35),
+    inset 0 1px 1px rgba(255, 255, 255, 1);
+  transform: rotate(-3deg);
+  display: grid; place-content: center;
+}
+.zar:last-child { transform: rotate(4deg); }
+.zarYuz {
+  display: grid;
+  grid-template-columns: repeat(3, 6px);
+  grid-template-rows: repeat(3, 6px);
+  gap: 3.5px;
+}
+.zarGoz { border-radius: 50%; }
+.zarGoz.dolu {
+  background: radial-gradient(circle at 34% 30%, #4a423a, #16120e 72%);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, .7), 0 1px 0 rgba(255, 255, 255, .8);
+}
+
+.zarDugme {
+  white-space: nowrap;
+  background: linear-gradient(180deg, #1f7845 0%, #125730 100%);
+  color: #ffffff; border: none;
+  border-radius: 999px; padding: 11px 22px; font-size: 14px; font-weight: 700;
+  cursor: pointer; letter-spacing: .04em;
+  box-shadow:
+    0 3px 0 #0d4526,
+    0 10px 18px rgba(30, 90, 55, .38),
+    inset 0 1px 0 rgba(255, 255, 255, .40);
+  transition: transform .08s ease, box-shadow .08s ease;
+}
+.zarDugme:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 #0d4526, 0 4px 8px rgba(30, 90, 55, .38),
+              inset 0 1px 0 rgba(255, 255, 255, .25);
+}
+.zarDugme:disabled {
+  background: linear-gradient(180deg, #e2dacb 0%, #d2c8b5 100%);
+  color: var(--sonuk); cursor: default;
+  box-shadow: 0 2px 0 #bdb29c, inset 0 1px 0 rgba(255, 255, 255, .6);
+}
+
+/* ---------- pullar ---------- */
+/* Pullar taşların DEĞİL tahtanın çocuğu: kareden kareye yürüyebilmeleri
+   için taşın kutusundan çıkmaları gerekiyordu. */
+.pulKatmani { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
+.pulKatmani .pul {
+  position: absolute;
+  width: 11px; height: 11px; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    inset -1px -1.5px 2px rgba(0, 0, 0, .40),
+    inset 1px 1px 1.5px rgba(255, 255, 255, .70),
+    0 2px 3px rgba(70, 56, 34, .45);
+}
+/* PUL BİR PARA PULU: pirinç, üstten ışık alan. Oyuncunun kendi pulu
+   masadaki en değerli nesne olmalı — gözün tahtada ilk bulduğu şey o. */
+.pul.p0 {
+  background: radial-gradient(circle at 36% 30%, #F1DDA6 0%, var(--t-pirinc) 56%, #7E6318 100%);
+}
+.pul.p1 { background: radial-gradient(circle at 36% 30%, #7FC7A0, var(--t-banknot) 60%, #17422B); }
+.pul.p2 { background: radial-gradient(circle at 36% 30%, #D9A08F, #A4392C 60%, #61201A); }
+.pul.p3 { background: radial-gradient(circle at 36% 30%, #BDB3CC, #857A99 60%, #494056); }
+.pulKatmani .pul.benim { box-shadow:
+  inset -1px -1.5px 2px rgba(0,0,0,.40),
+  inset 1px 1px 1.5px rgba(255,255,255,.70),
+  0 2px 3px rgba(70,56,34,.45),
+  0 0 0 2px var(--metin); }
+.pulKatmani .pul[hidden] { display: none; }
+
+/* Kart açılırken ölçek JS'ten geliyor. */
+.kart { transform-origin: center; }
+
+/* ---------- bilanço: ana ekran ---------- */
+.bilanco {
+  background: var(--yuzey); border: 1px solid var(--cizgi);
+  border-radius: var(--r); padding: 14px; margin-bottom: 12px;
+  box-shadow: 0 1px 2px rgba(90, 74, 48, .08);
+  cursor: pointer;
+}
+.bilanco:hover { border-color: var(--sonuk); }
+
+.etiket {
+  font-size: 10px; letter-spacing: .12em; color: var(--sonuk);
+  text-transform: uppercase;
+}
+
+/* Yarış: panelin kahramanı. Diğer her şey ondan sonra geliyor. */
+.yaris { margin-bottom: 14px; }
+.yarisUst { display: flex; justify-content: space-between; align-items: baseline; }
+.yarisUst b { font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+.cubuk {
+  height: 10px; background: #ded5c4; border-radius: 999px;
+  margin: 7px 0 6px; overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(90, 74, 48, .18);
+}
+.dolgu {
+  height: 100%; width: 0; border-radius: 999px;
+  background: linear-gradient(90deg, #35a865, #1e7d47);
+  transition: width .4s ease;
+}
+.kalan { font-size: 12px; color: var(--sonuk); }
+.kalan b { color: var(--metin); font-variant-numeric: tabular-nums; }
+
+/* Yarışan iki sayı yan yana. Ayrı kutular, çünkü biri diğerini
+   geçtiğinde oyun bitiyor — ilişkileri bir listede kaybolmamalı. */
+.ikili { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.kutu {
+  background: var(--yuzey2); border: 1px solid var(--cizgi);
+  border-radius: 10px; padding: 9px 11px;
+  display: grid; gap: 3px;
+}
+.kutu b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.artiKutu { background: #e8f3ea; border-color: #bcd9c4; }
+.artiKutu b { color: var(--aksan); }
+.eksiKutu { background: #f6e7e2; border-color: #e0bfb4; }
+.eksiKutu b { color: var(--kayip); }
+.ikili.ince .kutu { padding: 7px 11px; }
+.ikili.ince .kutu b { font-size: 14px; }
+
+.tabloAc {
+  margin-top: 4px; font-size: 12.5px; font-weight: 600; color: var(--aksan);
+  display: flex; align-items: center; gap: 6px;
+}
+.tabloAc .ok { font-size: 15px; }
+
+/* ---------- geçmiş ---------- */
+.gecmisListe {
+  max-height: 58vh; overflow-y: auto;
+  display: grid; gap: 7px;
+  padding-right: 4px; margin-bottom: 4px;
+}
+.g { font-size: 12.5px; color: var(--sonuk); display: flex; gap: 8px; align-items: baseline; }
+.g .tur { color: var(--cizgi); flex: none; font-variant-numeric: tabular-nums; }
+.g .kim { color: var(--metin); flex: none; opacity: .8; }
+.g.benim .kim { color: var(--aksan); opacity: 1; }
+.g.masa .kim { color: var(--uyari); }
+
+/* ---------- modal ---------- */
+.ortu {
+  position: fixed; inset: 0; background: rgba(58, 48, 32, .42);
+  display: grid; place-items: center; padding: 16px; z-index: 10;
+  backdrop-filter: blur(2px);
+}
+.modal {
+  background: var(--yuzey); border: 1px solid var(--cizgi);
+  box-shadow: 0 18px 40px rgba(60, 48, 30, .28);
+  border-radius: 16px; padding: 16px; width: 100%; max-width: 480px;
+  max-height: 88vh; overflow-y: auto;
+}
+.modalBaslik { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+.modalAlt { font-size: 12px; color: var(--sonuk); margin-bottom: 12px; }
+.kartlar { display: grid; gap: 10px; }
+@media (min-width: 460px) { .kartlar.iki { grid-template-columns: 1fr 1fr; } }
+.kart { background: var(--yuzey2); border: 1px solid var(--cizgi); border-radius: 12px; padding: 12px; }
+.kart .etiket { font-size: 10px; letter-spacing: .1em; color: var(--sonuk); text-transform: uppercase; }
+.kart .b { font-size: 15px; font-weight: 700; margin: 3px 0 6px; }
+.kart .a { font-size: 12px; color: var(--sonuk); margin-bottom: 10px; }
+.kart .sat { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; }
+.kart .sat span { color: var(--sonuk); }
+.kart .risk { font-size: 11px; color: var(--uyari); margin: 8px 0; }
+/* Getiri capasi: kartin destedeki yerini soyluyor. Renk tek basina
+   yetmez, yazi da soyluyor -- renk korligu olan oyuncu icin. */
+.kart .capa { font-size: 11px; margin: 6px 0 2px; font-weight: 600; }
+.kart .capa.iyi { color: var(--aksan); }
+.kart .capa.kotu { color: var(--sonuk); }
+/* Taahhut karti: fesih kurali normal risk satirindan ayrilsin.
+   Kural karttan okunamazsa oyuncu onu ancak parasini kaybederek
+   ogrenir; bu zorluk degil gizli tuzak olurdu. */
+.kart .risk.uyari {
+  color: var(--kayip); font-weight: 600;
+  background: #f6e7e2; border: 1px solid #e0bfb4;
+  border-radius: 8px; padding: 7px 9px;
+}
+.dugme {
+  width: 100%; border: none; border-radius: 10px; padding: 11px;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  /* Aksan açık temada koyulaştı: üstüne koyu yazı 3,48 kontrast
+     veriyordu. Beyaz yazı 6,4'e çıkarıyor. */
+  background: var(--aksan); color: #ffffff; margin-top: 8px;
+}
+.dugme:disabled { background: var(--yuzey); color: var(--sonuk); cursor: default; }
+/* Es karari: iki dugme yan yana, esit agirlikta. Alt alta
+   koysaydim ustteki varsayilan cevap gibi okunurdu; bu kararin
+   varsayilani yok. */
+.esSecim { display: flex; gap: 10px; }
+.esSecim .dugme { flex: 1; }
+.dugme.ikincil { background: none; border: 1px solid var(--cizgi); color: var(--sonuk); }
+.dugme.ikincil:hover { color: var(--metin); }
+.dugme.altin { background: var(--altin); color: #ffffff; }
+
+/* KREDİ DÜĞMESİ İKİNCİ YOL OLDUĞUNU SÖYLÜYOR: çerçeveli ve sönük,
+   dolu değil. Nakitle alma düğmesiyle aynı ağırlıkta görünseydi
+   borçlanmak eşdeğer bir seçim gibi dururdu — değil. */
+.dugme.kredi {
+  background: none;
+  border: 1px solid var(--altin);
+  color: var(--altin);
+  margin-top: 6px;
+}
+.dugme.kredi:hover { background: var(--altin); color: #ffffff; }
+
+.satisSatir {
+  display: grid; gap: 2px; background: var(--yuzey2); border: 1px solid var(--cizgi);
+  border-radius: 10px; padding: 10px; margin-bottom: 8px;
+}
+.satisSatir .u { display: flex; justify-content: space-between; font-size: 13px; }
+.satisSatir .d { font-size: 11px; color: var(--sonuk); }
+.satisSatir .uyari { font-size: 11px; color: var(--uyari); }
+
+/* ---------- çoklu satış ---------- */
+/* Satır artık düğme değil SEÇİM: bir teklifte birden çok varlık
+   satılabiliyor ve her satırın kendi SAT düğmesi olsaydı bu mümkün
+   olmazdı. Dokunma alanı satırın tamamı. */
+.satisSatir.secmeli { cursor: pointer; transition: border-color .12s ease, background .12s ease; }
+.satisSatir.secmeli:hover { border-color: var(--sonuk); }
+.satisSatir.secili { border-color: var(--aksan); background: #eaf6ee; }
+
+.satisSatir .u { align-items: center; gap: 9px; }
+.satisSatir .u .ad { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onayKutu {
+  flex: none; width: 19px; height: 19px; border-radius: 6px;
+  border: 2px solid var(--cizgi); background: var(--yuzey);
+}
+.satisSatir.secili .onayKutu {
+  background: var(--aksan); border-color: var(--aksan);
+  position: relative;
+}
+.satisSatir.secili .onayKutu::after {
+  content: '\2713'; position: absolute; inset: 0;
+  color: #fff; font: 700 12px/15px system-ui, sans-serif; text-align: center;
+}
+
+/* KÂR/ZARAR KENDİ SATIRINDA. Rakamın yanına sıkıştırmak, oyuncunun
+   kararını veren tek sayıyı diğerlerinin arasında kaybetmek olurdu. */
+.karZarar {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-top: 5px; padding: 5px 8px; border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.karZarar .etiketKz { font-size: 9px; letter-spacing: .14em; }
+.karZarar b { font-size: 14px; }
+.karZarar.kar { background: #e6f4ec; color: var(--aksan); }
+.karZarar.zarar { background: #fbeae7; color: var(--kayip); }
+
+.satisOzet {
+  margin: 10px 0 2px; text-align: center; font-size: 12px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.satisOzet.kar { color: var(--aksan); }
+.satisOzet.zarar { color: var(--kayip); }
+
+.sonuc { text-align: center; padding: 10px 0 4px; }
+.sonuc .buyuk { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+.sonuc .kazandi { color: var(--altin); }
+.sonuc .kaybetti { color: var(--kayip); }
+
+/* ---------- seçim ekranları ---------- */
+.secim { max-width: 560px; margin: 0 auto; padding: 20px 12px 96px; }
+.secimUst { margin-bottom: 16px; }
+.secimBaslik { font-size: 24px; font-weight: 700; letter-spacing: -.01em; }
+.secimAlt { font-size: 13px; color: var(--sonuk); margin-top: 5px; }
+.secimListe { display: grid; gap: 8px; }
+
+.sec {
+  text-align: left; width: 100%; cursor: pointer;
+  background: var(--yuzey); border: 1px solid var(--cizgi);
+  box-shadow: 0 1px 2px rgba(90, 74, 48, .07);
+  border-radius: 12px; padding: 12px; color: var(--metin);
+  display: grid; gap: 6px;
+}
+.sec:hover { border-color: var(--sonuk); }
+.sec.secili {
+  border-color: var(--aksan);
+  background: #eaf6ee;
+  box-shadow: 0 0 0 2px rgba(30, 125, 71, .18);
+}
+.sec .secUst { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.sec .ad { font-size: 15px; font-weight: 700; }
+.sec .rakam { font-size: 13px; color: var(--sonuk); white-space: nowrap; }
+.sec .aciklama { font-size: 12px; color: var(--sonuk); }
+.sec .kalemler { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; }
+.sec .kalemler span { color: var(--sonuk); }
+.sec .kalemler b { font-variant-numeric: tabular-nums; }
+.sec .marj { color: var(--aksan); }
+.sec .marj.dusuk { color: var(--uyari); }
+
+.secimAyak {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  display: flex; gap: 8px; padding: 12px;
+  background: linear-gradient(to top, var(--zemin) 65%, transparent);
+  max-width: 560px; margin: 0 auto;
+}
+.secimAyak .dugme { margin-top: 0; }
+.secimAyak .ikincil { max-width: 110px; }
+
+.hayalim { color: var(--altin); font-size: 12px; margin-left: 10px; }
+
+/* ---------- mali tablo ---------- */
+.bilanco { cursor: pointer; }
+.bilanco:hover { border-color: var(--sonuk); }
+.tikla { color: var(--aksan); display: block; margin-top: 4px; }
+
+.tabloBolum { margin-bottom: 16px; }
+.tabloBaslik {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 10px; letter-spacing: .14em; color: var(--sonuk);
+  text-transform: uppercase;
+  padding-bottom: 5px; border-bottom: 1px solid var(--cizgi); margin-bottom: 8px;
+}
+.tabloBaslik b {
+  letter-spacing: 0; text-transform: none;
+  font-size: 13px; color: var(--metin); font-variant-numeric: tabular-nums;
+}
+
+/* Mali tablonun üstündeki özet: "nerede duruyorum" sorusu ayrıntıdan
+   önce geliyor. */
+.ozetKutu {
+  background: var(--yuzey2); border: 1px solid var(--cizgi);
+  border-radius: 12px; padding: 12px; margin-bottom: 16px;
+}
+.ozetKutu .yarisUst b { font-size: 22px; }
+.ozetKutu .cubuk { margin: 8px 0 6px; }
+
+/* Kompozisyon çubuğu: kalem listesi "neyin ne kadar" sorusunu ancak
+   toplayarak yanıtlıyor, çubuk doğrudan yanıtlıyor. */
+.oranCubugu {
+  display: flex; height: 8px; border-radius: 999px; overflow: hidden;
+  margin-bottom: 9px; background: var(--yuzey2);
+  box-shadow: inset 0 1px 2px rgba(90, 74, 48, .14);
+}
+.oranCubugu .pay { height: 100%; }
+
+/* Tablonun asıl sonucu vurgulu: akış ve net değer. */
+.vurguKutu {
+  display: flex; justify-content: space-between; align-items: baseline;
+  background: #e8f3ea; border: 1px solid #bcd9c4;
+  border-radius: 10px; padding: 11px 13px; margin-bottom: 16px;
+  font-size: 13px; font-weight: 600;
+}
+.vurguKutu b { font-size: 17px; color: var(--aksan); font-variant-numeric: tabular-nums; }
+.vurguKutu.kotu { background: #f6e7e2; border-color: #e0bfb4; }
+.vurguKutu.kotu b { color: var(--kayip); }
+
+/* Varlık ve borç satırı: ad ve açıklama solda, tutar sağda. Tek
+   satıra sıkıştırınca uzun açıklamalar rakamı ekrandan itiyordu. */
+.kalemSatir {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 12px; padding: 7px 0;
+  border-bottom: 1px solid rgba(216, 207, 190, .55);
+}
+.kalemSatir:last-child { border-bottom: none; }
+.kalemSatir .sol { min-width: 0; }
+.kalemSatir .ad { font-size: 13px; color: var(--metin); }
+.kalemSatir .not { font-size: 11.5px; color: var(--sonuk); margin-top: 1px; }
+.kalemSatir b { font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tabloSatir { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 3px 0; }
+.tabloSatir b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tabloSatir.alt { color: var(--sonuk); font-size: 12px; padding-left: 10px; }
+.tabloSatir.alt b { color: var(--sonuk); font-weight: 500; }
+.tabloSatir.toplam { border-top: 1px solid var(--cizgi); margin-top: 4px; padding-top: 6px; font-weight: 700; }
+.bos { font-size: 12px; color: var(--sonuk); padding: 4px 0 4px 10px; }
+.dipnot { font-size: 11px; color: var(--uyari); margin: 10px 0; line-height: 1.4; }
+
+/* ---------- hayat durumu ve banka ---------- */
+.hayat { color: var(--sonuk); font-size: 12px; margin-left: 8px; }
+.ust { flex-wrap: wrap; gap: 6px; }
+.dilim { display: flex; gap: 8px; align-items: center; margin: 10px 0; }
+.dilim input { flex: 1; accent-color: var(--aksan); }
+.dilim b { min-width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Mali tablo içindeki tıklanabilir satır. Düğme gibi görünmeli ama
+   tablonun ritmini bozmamalı: aynı satır yüksekliği, sağda sayı ve ok. */
+.tabloDugme {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; padding: 10px 12px; margin-top: 2px;
+  background: var(--yuzey2); border: 1px solid var(--cizgi);
+  border-radius: 10px; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--metin);
+  font-family: inherit; text-align: left;
+}
+.tabloDugme:hover { border-color: var(--sonuk); background: #e3dbcc; }
+.tabloDugme .sag { display: flex; align-items: center; gap: 8px; color: var(--sonuk); }
+.tabloDugme .sag b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.tabloDugme .ok { font-size: 17px; line-height: 1; color: var(--aksan); }
+
+/* ---------- pul katmanı ---------- */
+/* Pullar taşların DEĞİL tahtanın çocuğu: kareden kareye yürüyebilmeleri
+   için taşın kutusundan çıkmaları gerekiyordu. */
+.pulKatmani { position: absolute; inset: 0; pointer-events: none; }
+.pulKatmani .pul {
+  position: absolute;
+  width: 11px; height: 11px;
+  transform: translate(-50%, -50%);
+  /* Konum her karede JS'ten geliyor; geçiş yok — yumuşatmayı motor
+     yapıyor (PulYolu), CSS'in ayrıca yumuşatması ikisini çakıştırırdı. */
+}
+.pulKatmani .pul.benim { box-shadow:
+  inset -1px -1.5px 2px rgba(0,0,0,.40),
+  inset 1px 1px 1.5px rgba(255,255,255,.70),
+  0 2px 3px rgba(70,56,34,.45),
+  0 0 0 2px var(--metin); }
+.pulKatmani .pul[hidden] { display: none; }
+
+/* Kart açılırken ölçek JS'ten geliyor; başlangıçta görünmez olmalı. */
+.kart { transform-origin: center; }
+
+/* ---------- meslek seçim kartları ---------- */
+/* Kart bir görsel: ad, maaş, açıklama ve rakamlar onun içinde. Iki
+   sütun, çünkü kartlar geniş ve tek sütunda liste çok uzuyor. */
+/* Kartın üstündeki rakamlar 160 px'de okunmuyor; kart bilginin kendisi
+   olduğu için sütun dar olamaz. 240 px'de telefonda tek, geniş ekranda
+   iki-üç sütun çıkıyor. */
+.secimListe.gorselKartlar {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  justify-items: center;
+}
+
+/* SEHIR KARTLARI GORSEL DEGIL TABLO: meslek ve hayalde secilen sey bir
+   hayat, sehirde secilen sey bir hesap. Ucu yan yana sigsin ki oyuncu
+   rakamlari karsilastirabilsin -- alt alta koysaydim karsilastirma
+   kaydirmayla yapilirdi. */
+/* ---------- ülke + şehir seçimi ---------- */
+/* Üç şehir kart kart duruyordu; ülke eklenince liste çalışmıyor.
+   Açılır liste, çünkü burada seçilen şey bir hayat değil bir ADRES. */
+.sehirKartlar { display: block; }
+.sehirSecim { display: grid; gap: 12px; max-width: 460px; margin: 0 auto; }
+.acilirSatir { display: grid; gap: 6px; }
+.acilirEtiket {
+  font-size: 12px; font-weight: 600; color: var(--sonuk);
+  letter-spacing: .02em;
+}
+/* Kendi okunu çiziyor: tarayıcının varsayılanı platformdan platforma
+   değişiyor ve iOS'ta kutunun yüksekliğini de kendi belirliyor. */
+.acilir {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; padding: 12px 38px 12px 13px;
+  font: 600 15px/1.2 system-ui, sans-serif; color: var(--metin);
+  background: var(--yuzey) no-repeat right 13px center;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%236d6355' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  border: 2px solid var(--cizgi); border-radius: 10px;
+  cursor: pointer;
+}
+.acilir:focus-visible { outline: 3px solid rgba(30, 125, 71, .35); outline-offset: 1px; }
+.sehirSecim .sehirKart { margin-top: 2px; }
+
+.sehirKart {
+  display: flex; flex-direction: column; gap: 9px;
+  text-align: left; padding: 16px; cursor: pointer;
+  background: var(--yuzey); border: 1px solid var(--cizgi);
+  border-radius: 14px; color: var(--metin); font: inherit;
+}
+.sehirKart:hover { border-color: var(--aksan); }
+.sehirKart.secili { border-color: var(--aksan); box-shadow: 0 0 0 2px var(--aksan); }
+.sehirAd { font-size: 17px; font-weight: 700; }
+.sehirAnlatim { font-size: 12px; color: var(--sonuk); line-height: 1.45; }
+.sehirTablo { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+.sehirTablo .sat { display: flex; justify-content: space-between; font-size: 12px; }
+.sehirTablo .sat b { font-variant-numeric: tabular-nums; }
+.sehirTablo .sat.iyi b { color: var(--aksan); }
+.sehirTablo .sat.kotu b { color: var(--kayip); }
+.sehirYargi {
+  font-size: 11px; line-height: 1.45; padding: 8px 10px; border-radius: 8px;
+}
+.sehirYargi.iyi { background: #e8f3ea; border: 1px solid #bcd9c4; }
+.sehirYargi.kotu { background: #f6e7e2; border: 1px solid #e0bfb4; }
+
+/* Hayal fiyatinin oyuncunun kendi olcegindeki karsiligi. */
+/* Uzaklik etiketi: renk tek basina yetmez, yazi da soyluyor. */
+.hayalUzak { font-size: 11px; font-weight: 600; padding: 8px 12px 0; }
+.hayalUzak.yakin  { color: var(--aksan); }
+.hayalUzak.uzun   { color: var(--uyari); }
+.hayalUzak.enUzun { color: var(--kayip); }
+.hayalOlcek { font-size: 11px; color: var(--sonuk); padding: 0 12px 10px; }
+
+.secKart {
+  position: relative;
+  padding: 0; border: 2px solid var(--cizgi); border-radius: 12px;
+  background: var(--yuzey); overflow: hidden; cursor: pointer;
+  width: 100%; text-align: left;
+  /* Açıklama satır sayısı karttan karta değişiyor; alt şerit kalan
+     yüksekliği doldurmazsa ızgaranın alt kenarı tırtıklı kalıyor. */
+  display: grid; grid-template-rows: auto 1fr; align-self: stretch;
+  box-shadow: 0 1px 3px rgba(90, 74, 48, .12);
+  transition: border-color .12s ease, transform .12s ease;
+}
+.secKart:hover { border-color: var(--sonuk); }
+.secKart.secili {
+  border-color: var(--aksan);
+  box-shadow: 0 0 0 4px rgba(30, 125, 71, .28), 0 4px 12px rgba(90, 74, 48, .22);
+  transform: translateY(-2px);
+}
+/* Kart karanlık bir fotoğraf; ince yeşil çerçeve tek başına seçildiğini
+   söylemiyor. Rozet kartın sağ üstünde, kendi numarası sol üstte. */
+.secKart.secili::after {
+  content: '\2713'; position: absolute; top: 8px; right: 8px;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--aksan); color: #fff;
+  font: 700 15px/26px system-ui, sans-serif; text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
+}
+.secKart { max-width: 340px; }
+
+.secGorsel {
+  width: 100%; height: auto; display: block;
+  /* YÜKLENMEDEN ÖNCE BEYAZ DEĞİL KOYU. Kartların hepsi karanlık birer
+     fotoğraf; boşken beyaz kalmaları sayfayı şerit şerit gösteriyordu.
+     Koyu zemin, gelen fotoğrafla aynı renkte olduğu için yükleme
+     görünmez oluyor. */
+  background: #1a1712;
+}
+
+/* ---------- meslek kartı: veriden çiziliyor ---------- */
+/* BURADAKI ESKI KURALLARIN HEPSI SILINDI ve niye silindiklerini
+   yazmakta fayda var: kartın tamamı tek bir fotoğraftı, o yüzden
+   burada en/boy oranı, kırpma yönü ve yükleme öncesi koyu zemin
+   ayarlanıyordu. Kart artık veriden çiziliyor (main.js/meslekKarti);
+   oranı içeriği belirliyor, kırpılacak bir şey yok ve zemin fotoğraf
+   değil kâğıt.
+
+   Fotoğraf yuvası duruyor ama metinsiz sanat gelene kadar boş: geldiği
+   gün üstte bir şerit olarak açılıyor, kartın gövdesi değişmiyor. */
+.secKart.meslek {
+  /* .secKart'ın 'auto 1fr' ızgarası hayal kartı için. Meslek kartının
+     çocuk sayısı fotoğrafın varlığına göre değişiyor; sütun yığını
+     ikisinde de doğru davranıyor. */
+  display: flex; flex-direction: column;
+  background: var(--yuzey);
+}
+.secKart.meslek .secGorsel {
+  aspect-ratio: 16 / 10; object-fit: cover;
+}
+
+.meslekYuz {
+  flex: 1; display: flex; flex-direction: column; gap: 7px;
+  padding: 10px 11px 11px;
+}
+
+.meslekUst { display: flex; align-items: flex-start; gap: 7px; }
+/* Rozet, basılı kartlardaki numaranın karşılığı: listedeki sıra. */
+.meslekSira {
+  flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--metin); color: var(--yuzey);
+  font: 700 12px/20px system-ui, sans-serif; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.meslekBas { min-width: 0; }
+.meslekAd {
+  font: 700 13.5px/1.25 system-ui, sans-serif; color: var(--metin);
+  text-wrap: balance;
+}
+.meslekMaas {
+  margin-top: 2px; font: 700 13px/1.2 system-ui, sans-serif;
+  color: var(--altin); font-variant-numeric: tabular-nums;
+}
+
+.meslekAck {
+  margin: 0; font-size: 11px; line-height: 1.45; color: var(--sonuk);
+}
+
+/* Rakamlar: etiket solda, sayı sağda, hepsi aynı genişlikte rakamla.
+   tabular-nums olmadan yirmi kartın sayıları birbirini tutmuyor ve
+   göz sütunu takip edemiyor. */
+.meslekTablo {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
+  margin: 0; padding-top: 7px; border-top: 1px solid var(--cizgi);
+  font-size: 11.5px; font-variant-numeric: tabular-nums;
+}
+.meslekTablo dt { color: var(--sonuk); }
+.meslekTablo dd { margin: 0; text-align: right; font-weight: 600; color: var(--metin); }
+.meslekTablo dd.iyi { color: var(--aksan); }
+.meslekTablo dd.kotu { color: var(--kayip); }
+
+/* KARARIN SAYISI. 'margin-top: auto' onu kartın en altına yapıştırıyor:
+   açıklama satır sayısı karttan karta değişiyor ve bu satır ızgarada
+   aynı hizada durmazsa yirmi kartı gözle karşılaştırmak zorlaşıyor. */
+.meslekMarj {
+  margin-top: auto; padding-top: 8px;
+  display: grid; grid-template-columns: 1fr auto; align-items: baseline;
+  gap: 2px 8px;
+}
+.meslekMarjAd { font-size: 11px; color: var(--sonuk); }
+.meslekMarjSayi {
+  font: 700 13px/1 system-ui, sans-serif; color: var(--aksan);
+  font-variant-numeric: tabular-nums;
+}
+.meslekCubuk {
+  grid-column: 1 / -1; margin-top: 5px; height: 4px; border-radius: 2px;
+  background: var(--yuzey2); overflow: hidden;
+}
+.meslekCubukDolu { height: 100%; background: var(--aksan); border-radius: 2px; }
+.secKart.secili .meslekCubukDolu { background: var(--aksan); }
+
+/* Meslek kartları kare, hayal kartları değil: kaynak kolajda satır
+   yükseklikleri farklı (0,73 ile 0,95 arası). Izgara tırtıklı olmasın
+   diye hepsi kareye kırpılıyor — kare hepsinden GENİŞ olduğu için
+   kırpma yalnızca alttan oluyor, numara rozeti ve başlık sol üstte
+   olduğu gibi duruyor. */
+.secKart.hayal .secGorsel {
+  height: auto; aspect-ratio: 1 / 1;
+  object-fit: cover; object-position: center top;
+}
+/* Kolajdaki geniş kart tek başına satırı kaplıyor; yanında hizalanacak
+   kart yok, o yüzden hiç kırpılmıyor. */
+.secKart.genis { grid-column: 1 / -1; max-width: none; }
+.secKart.genis .secGorsel { aspect-ratio: auto; object-fit: fill; }
+
+/* Hayal görselinde açıklama yok — o yüzden kartın altında duruyor. */
+.secKart .altYazi {
+  padding: 9px 11px 11px; font-size: 12px; line-height: 1.45;
+  color: var(--sonuk); border-top: 1px solid var(--cizgi);
+}
+.secKart.secili .altYazi { background: #eaf6ee; color: var(--metin); }
+
+/* ---------- kendi hayatım kartı ---------- */
+/* GÖRSELİ YOK VE OLMAMALI: burada seçilen şey bir fotoğraf değil,
+   oyuncunun kendi hayatı. Yirmi kartın başında duruyor. */
+.secKart.kendim { grid-column: 1 / -1; max-width: none; }
+.kendimYuz {
+  padding: 15px 16px 14px; display: grid; gap: 6px; text-align: left;
+  background:
+    repeating-linear-gradient(135deg,
+      rgba(200, 164, 77, .05) 0 8px, transparent 8px 16px),
+    var(--yuzey);
+  border-radius: 10px;
+}
+.kendimBaslik { font-size: 16px; font-weight: 800; color: var(--metin); }
+.kendimAlt { font-size: 12px; line-height: 1.5; color: var(--sonuk); }
+.kendimEylem { font-size: 12px; font-weight: 700; color: var(--aksan); }
+
+/* ---------- kendi hayatım formu ---------- */
+.formSatir { display: grid; gap: 5px; margin-bottom: 11px; }
+.formSatir.dikey { gap: 7px; }
+.formEtiket { font-size: 12px; color: var(--sonuk); }
+.formGiris {
+  width: 100%; padding: 11px 12px; border-radius: 10px;
+  border: 1px solid var(--cizgi); background: var(--yuzey);
+  color: var(--metin); font: inherit; font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.formGiris:focus { outline: 2px solid var(--aksan); outline-offset: 1px; }
+.formGiris::placeholder { color: var(--sonuk); opacity: .7; font-size: 13px; }
+
+.formSecim { display: flex; flex-wrap: wrap; gap: 7px; }
+.formDugme {
+  padding: 9px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--cizgi); background: var(--yuzey);
+  color: var(--sonuk); font: inherit; font-size: 13px;
+}
+.formDugme.secili {
+  background: var(--aksan); border-color: var(--aksan);
+  color: #fff; font-weight: 700;
+}
+
+.formBaslik {
+  font-size: 13px; font-weight: 800; margin: 18px 0 4px;
+  padding-top: 14px; border-top: 1px solid var(--cizgi);
+}
+.formAltBaslik { font-size: 12px; font-weight: 700; margin: 12px 0 5px; }
+.formNot { font-size: 11.5px; line-height: 1.5; color: var(--sonuk); margin-bottom: 10px; }
+
+/* Önizleme: hangi rakam kimin. */
+.defterKutu {
+  margin: 12px 0; padding: 12px 13px; border-radius: 12px;
+  background: var(--yuzey2); border: 1px solid var(--cizgi);
+}
+/* KILAVUZ ÇİZGİ KURALI '#oyun .istatistik' ile sınırlıydı ve burada
+   ölüydü: etiketle rakam bitişik çıkıyordu. Defter satırı artık iki
+   yerde birden var, kural da öyle olmak zorunda. */
+.defterKutu .defSat {
+  display: grid; grid-template-columns: auto 1fr auto;
+  align-items: baseline; gap: 9px; padding: 3px 0; line-height: 1.3;
+}
+.defterKutu .defSat > span:first-child { color: var(--sonuk); font-size: 13px; }
+.defterKutu .defKilavuz {
+  border-bottom: 1px dotted var(--cizgi); transform: translateY(-3px);
+}
+.defterKutu .defSat b { font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.defterKutu .defSat.iyi b { color: var(--aksan); }
+.defterKutu .defSat.kotu b { color: var(--kayip); }
+/* MAAŞ UYARISI. Kartın diğerlerinden farkı parasında değil: alırsan
+   işinden oluyorsun ve bu, fiyatın yanına sıkıştırılacak bir bilgi
+   değil. Mühür kırmızısı, oyunun kayıp rengi. */
+.maasUyari {
+  display: grid; gap: 3px; margin: 9px 0;
+  padding: 9px 11px; border-radius: 9px;
+  background: #fbeae7; border-left: 3px solid var(--kayip);
+  font-size: 11.5px; line-height: 1.45;
+}
+.maasUyari b { font-size: 12.5px; color: var(--kayip); }
+.maasUyari span { color: var(--sonuk); }
+.maasUyari.tam { background: #f8ded9; }
+
+/* Oyun sonu analizi satırları. */
+.analizSatir { font-size: 13px; line-height: 1.55; padding: 5px 0; }
+.analizSatir.vurgu { color: var(--uyari); font-weight: 600; }
+
+.kiyasNot {
+  font-size: 12.5px; line-height: 1.5; color: var(--aksan);
+  font-weight: 600; margin-bottom: 10px;
+}
+.notListe { display: grid; gap: 2px; }
+.notSatir {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
+  padding: 7px 0; border-bottom: 1px dashed var(--cizgi);
+  font-size: 12.5px;
+}
+.notSatir:last-child { border-bottom: 0; }
+.notSatir b { font-variant-numeric: tabular-nums; }
+.notKaynak {
+  grid-column: 1 / -1; font-size: 11px; color: var(--sonuk); font-style: italic;
+}
+/* OYUNCUNUN KENDİ YAZDIĞI RAKAM AYRI GÖRÜNÜYOR: listenin tamamı aynı
+   görünseydi liste hiçbir işe yaramazdı. */
+.notSatir.seninki { border-left: 2px solid var(--aksan); padding-left: 9px; }
+.notSatir.seninki .notKaynak { color: var(--aksan); font-style: normal; }
+
+/* ---------- kimlik şeridi ---------- */
+/* Oyuncu kim ve neyin peşinde: meslek adı ve hayalin fotoğrafı oyun
+   boyunca görünür. */
+.kimlik {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; margin-bottom: 10px;
+  background: var(--yuzey); border: 1px solid var(--cizgi);
+  border-radius: 12px;
+}
+.kimlikGorsel {
+  width: 42px; height: 42px; flex: none;
+  border-radius: 9px; object-fit: cover; object-position: center 65%;
+  background: var(--cizgi);
+}
+.kimlikYazi { min-width: 0; }
+.kimlikMeslek {
+  font-size: 13px; font-weight: 700; color: var(--metin);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kimlikHayal {
+  font-size: 12px; color: var(--altin); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---------- modal içi hayal fotoğrafı ---------- */
+/* Kartın başlığı görselin SOL ÜSTÜNDE; modalda hayalin adı zaten metin
+   olarak yazıyor, yarım kalmış bir başlık şeridi gürültü olurdu. Sağdan
+   ve %60 yükseklikten kırpmak ikisini de dışarıda bırakıyor: dar
+   kartlarda üst şerit, geniş kartta sol şerit. */
+.modalGorsel {
+  width: 100%; display: block; border-radius: 10px;
+  aspect-ratio: 2 / 1; object-fit: cover; object-position: right 60%;
+  margin-bottom: 12px;
+}
+
+/* ---------- makro duyuru ---------- */
+/* Faizin yönü ilk bakışta okunmalı: oyuncunun öğrenmesi gereken işaret
+   bu ve metnin içine gömülürse kimse okumuyor. */
+.duyuruRozet {
+  display: inline-block; margin-bottom: 10px;
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; letter-spacing: .06em;
+}
+.duyuruRozet.daralma { background: #f6e7e2; color: var(--kayip); border: 1px solid #e0bfb4; }
+.duyuruRozet.genisleme { background: #e4f2e9; color: var(--aksan); border: 1px solid #bcdcc8; }
+
+/* Eşiğe gelindiğinde uyarı dipnot olamaz: bir sonraki "geç" portföyü
+   vuracak ve oyuncunun bunu görmemesi haksızlık olur. */
+.uyariKutu {
+  margin-top: 10px; padding: 9px 11px; border-radius: 10px;
+  background: #f6e7e2; border: 1px solid #e0bfb4;
+  color: var(--kayip); font-size: 12px; line-height: 1.45; font-weight: 600;
+}
+
+/* ---------- boş tur notu ---------- */
+.turNotu {
+  margin: 0 0 10px; padding: 9px 12px; border-radius: 10px;
+  background: var(--yuzey); border: 1px dashed var(--cizgi);
+  color: var(--sonuk); font-size: 13px; text-align: center;
+}
+
+/* ---------- fırsat kararındaki para paneli ---------- */
+.paraDurumu { margin-top: 12px; display: grid; gap: 8px; }
+.paraOzet {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px;
+  padding: 9px 11px; border-radius: 10px;
+  background: var(--yuzey); border: 1px solid var(--cizgi);
+}
+.paraSatir { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+.paraSatir span { color: var(--sonuk); }
+.paraSatir b { font-variant-numeric: tabular-nums; }
+.paraSatir.iyi b { color: var(--aksan); }
+.paraSatir.kotu b { color: var(--kayip); }
+
+
+/* ==================================================================
+   YENİDEN TASARIM
+   Beyaz kartlar, yumuşak gölge, renkli ikonlar. Tahta koyu bir panelin
+   içinde: oyuncunun kimliği ve durduğu yer aynı yüzeyde okunsun.
+   ================================================================== */
+
+main { max-width: 560px; padding: 14px 12px 48px; }
+
+.kart {
+  background: var(--yuzey);
+  border: 1px solid var(--cizgi);
+  border-radius: 20px;
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 10px rgba(60, 48, 30, .06);
+}
+
+/* OYUN EKRANINDAKİ KARTLAR. #oyun ile sınırlı, çünkü '.kart' modalin
+   içindeki fırsat kartlarında da kullanılıyor: sınırlamasaydım krem bir
+   modalin içine mürekkep kartlar düşerdi. */
+#oyun .kart {
+  background: var(--t-yuzey);
+  border-color: var(--t-cizgi);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, .3);
+  color: var(--t-metin);
+}
+#oyun .etiket, #oyun .kalan, #oyun .hedefCumlesi, #oyun .panelBos { color: var(--t-sonuk); }
+#oyun .kalan b { color: var(--t-metin); }
+#oyun .trend.iyiTrend { color: var(--t-banknotAc); }
+#oyun .trend.kotuTrend { color: var(--t-kayip); }
+
+/* Karşılama çubuğu: oyuk mürekkep, dolgusu banknot yeşili ve hafifçe
+   parlıyor — masadaki tek ışıklı şey o olsun, çünkü oyunun tek sorusu o. */
+#oyun .cubuk {
+  background: rgba(0, 0, 0, .45);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .6);
+}
+#oyun .dolgu {
+  background: linear-gradient(90deg, var(--t-banknot), var(--t-banknotAc));
+  box-shadow: 0 0 14px rgba(79, 169, 122, .45);
+}
+#oyun .buyukOran, #oyun .hedefKutu b { color: var(--t-pirinc); }
+
+/* Alt panellerde kazanç ve borç: krem tema renkleri (#1e7d47, #a8382a)
+   mürekkep üstünde ikisi de okunmuyordu — biri koyu yeşil, diğeri koyu
+   bordo lekesi. */
+#oyun .panelSatir .artiDeger { color: var(--t-banknotAc); }
+#oyun .panelSatir .eksiDeger { color: var(--t-kayip); }
+#oyun .panelSatir .ad { color: var(--t-metin); }
+#oyun .panelBaslik svg {
+  width: 15px; height: 15px; stroke: var(--t-pirinc); fill: none;
+  stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none;
+}
+
+/* HAYAL ŞERİDİNİN ALT KENARI SERT BİTİYORDU: fotoğraf mürekkep karta
+   bıçakla kesilmiş gibi oturuyordu.
+   ÜSTÜNE DEĞİL, KENDİSİNE. Önce karartan bir katman koymuştum ve
+   yüksekliğini 'kartın %40'ı' diye hesaplamıştım — oysa şerit KARTIN
+   değil kendi oranının (5:2) yüksekliğinde. Kart, altındaki yazı
+   kadar uzadığı için katman fotoğrafın ortasında bitiyor ve tam
+   oraya yeşilimsi bir bant çiziyordu.
+   Maske o hesabı tamamen ortadan kaldırıyor: fotoğrafın kendisi
+   aşağı doğru saydamlaşıyor, arkasından kartın rengi ne ise o
+   görünüyor. Yanlış hizalanabileceği bir sayı kalmadı. */
+#oyun .hayalKart { position: relative; }
+#oyun .hayalBanner {
+  display: block;
+  -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 62%, transparent 100%);
+}
+#oyun .hayalAd { color: var(--t-metin); }
+
+/* Boş tur notu: masaya bırakılmış bir pusula. */
+#oyun .turNotu {
+  background: rgba(0, 0, 0, .28);
+  border: 1px dashed var(--t-cizgi);
+  color: var(--t-sonuk);
+}
+
+/* ---------- tahta paneli ---------- */
+.tahtaPanel {
+  position: relative;
+  border-radius: 22px;
+  padding: 12px 12px 16px;
+  margin-bottom: 14px;
+  /* MASA. Önce gökyüzü-su geçişiydi; hoştu ama oyunun konusuyla
+     ilgisi yoktu. Şimdi mürekkep keçe: üstünde kâğıt taşların durduğu
+     bir masa yüzeyi. Işık tam ortada değil, hafif yukarıda — düz bir
+     zemin değil, üstüne bir lamba düşen bir masa. */
+  background:
+    radial-gradient(118% 92% at 50% 30%, #23342C 0%, #131E19 56%, #0A100D 100%);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, .45);
+  color: var(--t-kagit);
+}
+
+.panelUst {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px;
+}
+.avatar {
+  width: 44px; height: 44px; border-radius: 14px; flex: none;
+  background: rgba(255, 255, 255, .16) center / cover no-repeat;
+  border: 2px solid rgba(255, 255, 255, .35);
+}
+/* Fotoğraf yokken mesleğin baş harfi. Harfin kendisi çeviriden
+   geliyor, yani dil değişince avatar da değişiyor. */
+.avatar.harf {
+  display: grid; place-items: center;
+  font: 700 19px/1 system-ui, sans-serif;
+  color: var(--t-kagit);
+  background: rgba(255, 255, 255, .12);
+}
+.panelKimlik { min-width: 0; flex: 1; }
+.panelMeslek {
+  font-size: 14px; font-weight: 700; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.panelHayal {
+  /* Mavi panelden kalma soğuk gri-mavi (#bcd8e4) mürekkep masada
+     yabancı duruyordu; nötrü sıcağa çekilmiş bir kâğıt grisi. */
+  font-size: 11.5px; color: #9FAAA1; margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.turRozet {
+  flex: none; display: flex; align-items: baseline; gap: 5px;
+  background: rgba(255, 255, 255, .12); border-radius: 999px;
+  padding: 5px 12px; border: 1px solid rgba(255, 255, 255, .18);
+}
+.turRozet .turEtiket { font-size: 10px; letter-spacing: .1em; color: #9FAAA1; }
+.turRozet .turSayi { font-size: 17px; font-weight: 700; color: #fff; }
+
+.yuvarlakDugme {
+  flex: none; width: 46px; height: 46px; border-radius: 15px;
+  background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .22);
+  color: #fff; cursor: pointer; display: grid; place-items: center; gap: 0;
+  line-height: 1;
+}
+.yuvarlakDugme:hover { background: rgba(255, 255, 255, .24); }
+.yuvarlakDugme .ikon { font-size: 17px; }
+.yuvarlakDugme .alt { font-size: 8.5px; letter-spacing: .04em; color: #A7B3A9; }
+
+.panelHayat {
+  margin-top: 8px; text-align: center;
+  font-size: 11.5px; color: #8E9A91;
+}
+
+/* ---------- yarış kartı ---------- */
+.yarisKart .yarisUst {
+  display: flex; align-items: baseline; justify-content: space-between;
+}
+.buyukOran { font-size: 30px; font-weight: 800; letter-spacing: -.02em; }
+.yarisKart .cubuk {
+  height: 10px; border-radius: 999px; background: var(--yuzey2);
+  overflow: hidden; margin: 8px 0 6px;
+}
+.cubuk.ince { height: 8px; margin: 6px 0; }
+.yarisKart .kalan { font-size: 12px; color: var(--sonuk); }
+
+/* DEFTER SATIRI, dört yuvarlak kutunun yerine.
+   Noktalı kılavuz çizgi mali belgelerin kendi çözümü: etiketi rakama
+   bağlıyor, göz aradaki boşlukta kaybolmuyor. Dört kutu ekranın
+   yarısını yiyordu; cetvel aynı dört rakamı üçte bir yerde veriyor ve
+   rakamlar ALT ALTA hizalandığı için ilk kez karşılaştırılabiliyor —
+   yan yana iki kutuda bu mümkün değildi. */
+.dortlu { display: grid; gap: 0; margin: 12px 0 8px; }
+.istatistik {
+  display: grid; grid-template-columns: auto 1fr auto auto;
+  align-items: baseline; gap: 9px; padding: 3px 0;
+  background: none; border: 0; border-radius: 0;
+  /* SATIR ARALIĞI CETVELİN KENDİSİ. Gövdeden gelen 1,45 satır yüksekliği
+     metin için doğru, rakam listesi için değil: dört satır ekrana
+     dağılıyor ve aralarındaki boşluk bilgi taşımadığı hâlde cetveli
+     cetvel olmaktan çıkarıyordu. 1,2 ile satırlar bir blok oluyor,
+     yazılar da büyüdüğü hâlde toplam yükseklik düşüyor. */
+  line-height: 1.2;
+}
+.istatistik .isIkon { display: none; }
+.istatistik .etiket { font-size: 13px; letter-spacing: 0; text-transform: none; }
+.istatistik .defKilavuz {
+  border-bottom: 1px dotted var(--t-cizgi); transform: translateY(-3px);
+}
+.istatistik b { font-size: 15.5px; font-weight: 500; font-variant-numeric: tabular-nums; }
+#oyun .istatistik b { color: var(--t-metin); }
+#oyun .istatistik.iyi b { color: var(--t-banknotAc); }
+#oyun .istatistik.kotu b { color: var(--t-kayip); }
+.istatistik .trend { font-size: 12px; min-width: 10px; }
+
+.dugme.genis { width: 100%; }
+
+/* ---------- hayal kartı ---------- */
+.hayalKart { padding: 0; overflow: hidden; }
+.hayalBanner {
+  width: 100%; display: block; aspect-ratio: 5 / 2;
+  object-fit: cover; object-position: right 60%;
+}
+.hayalGovde { padding: 14px 16px 16px; }
+.hayalAd { font-size: 16px; font-weight: 700; }
+.hedefCumlesi { font-size: 12.5px; color: var(--sonuk); margin-top: 3px; }
+.hedefKutu {
+  margin-top: 12px; padding: 10px 12px; border-radius: 14px;
+  background: rgba(0, 0, 0, .25); border: 1px solid var(--t-cizgi);
+  display: grid; grid-template-columns: 1fr auto; align-items: center;
+  gap: 2px 10px;
+}
+.hedefKutu .etiket { grid-column: 1; font-size: 9.5px; letter-spacing: .08em; }
+.hedefKutu .cubuk { grid-column: 1; }
+.hedefKutu b { grid-column: 2; grid-row: 1 / 3; font-size: 20px; }
+
+/* HEDEFE YAKLAŞMA CÜMLESİ. Rakamların dilinden ayrı dursun diye italik
+   ve pirinç: oyunun geri kalanı ölçüyor, bu satır tek başına
+   hatırlatıyor. Tırnak, cümlenin oyuncuya değil hayale ait olduğunu
+   söylüyor. */
+#oyun .hayalSozu {
+  margin-top: 10px; padding: 9px 12px; border-radius: 10px;
+  background: rgba(200, 164, 77, .08);
+  border-left: 2px solid var(--t-pirinc);
+  color: #D9C89A; font-size: 12.5px; line-height: 1.5; font-style: italic;
+}
+
+/* ---------- alt paneller ---------- */
+.paneller { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 460px) { .paneller { grid-template-columns: 1fr; } }
+.panel { padding: 14px; margin-bottom: 0; }
+.panelBaslik {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 700; margin-bottom: 10px;
+}
+.panelListe { display: grid; gap: 7px; }
+.panelSatir {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 12px;
+}
+.panelSatir .ad { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panelSatir b { font-variant-numeric: tabular-nums; }
+.panelSatir .artiDeger { color: var(--aksan); }
+.panelSatir .eksiDeger { color: var(--kayip); }
+.panelBos { font-size: 12px; color: var(--sonuk); }
+
+
+/* ---------- tahta: koyu panelin üstünde ---------- */
+/* Karolar artık koyu bir zeminde duruyor: eski açık zemin için
+   yazılmış ince gölgeler kaybolup taşları donuk bırakıyordu.
+   Kabartma daha sert, kenarlar daha parlak. */
+/* GİLYOŞ: banknotların ve tahvillerin üstündeki iç içe geçmiş çizgi
+   deseni. Çemberin içi Kısır Döngü'nün kendisi ve oyunun parayla ilgili
+   olduğunu söyleyen tek görsel işaret buydu — önce düz bir krem daireydi,
+   yani hiçbir şey söylemiyordu.
+   TEK PİKSEL GÖRSEL KULLANMIYOR: iki tekrarlı degrade üst üste. Dosya
+   olsaydı her ekran boyutunda ayrı bir sürüm üretmek gerekirdi. */
+.tahtaPanel .icZemin {
+  /* En üstteki katman bir MASKE. Konik degradenin çizgileri merkezden
+     çıktığı için dışarı doğru kalınlaşıyor: ilk denemede desen değil,
+     ZAR AT düğmesinin arkasından fışkıran bir ışın demeti çıktı.
+     Bu katman ortayı ve kenarı karartıyor, desen yalnızca aradaki
+     halkada görünüyor — gilyoş zaten orada olmalı. */
+  background:
+    radial-gradient(circle at 50% 50%,
+      rgba(10, 16, 13, .96) 0%, rgba(10, 16, 13, .90) 30%,
+      rgba(10, 16, 13, .34) 48%, rgba(10, 16, 13, .34) 78%,
+      rgba(10, 16, 13, .92) 100%),
+    repeating-conic-gradient(from 0deg,
+      rgba(200, 164, 77, .34) 0deg .5deg, transparent .5deg 3deg),
+    repeating-radial-gradient(circle at 50% 50%,
+      rgba(79, 169, 122, .22) 0 1px, transparent 1px 6px),
+    radial-gradient(circle at 50% 40%, var(--t-murekkep2) 0%, #0C120F 74%);
+  border: 1px solid rgba(200, 164, 77, .18);
+  box-shadow:
+    inset 0 0 44px rgba(0, 0, 0, .55),
+    0 0 26px rgba(200, 164, 77, .06);
+}
+
+/* Kâğıt taş mürekkep masanın üstünde: ince koyu bir kenar (basılmış
+   kâğıdın kesim çizgisi), altında masaya düşen gölge. Parlak beyaz
+   çerçeve kaldırıldı — kâğıdın kenarı parlamaz. */
+.tahtaPanel .kare {
+  border-color: rgba(51, 41, 27, .28);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, .45),
+    0 3px 0 rgba(0, 0, 0, .22),
+    0 6px 11px rgba(0, 0, 0, .42),
+    inset 0 1px 0 rgba(255, 255, 255, .55);
+}
+.tahtaPanel .kareAd { color: var(--t-yazi); font-weight: 700; }
+
+/* KULVAR VURGUSU, koyu panel sürümü.
+   Sönük kulvar koyu zeminde %45 saydamlıkta kayboluyordu, o yüzden
+   %62'ye çekildi. Ama sadece SÖNÜK hâli yazılmıştı ve bu kural
+   ".tahta.disKulvarda .kare.dis" ile aynı özgüllükte olup ondan SONRA
+   geldiği için onu eziyordu: oyuncu Kısır Döngü'den çıkıp dış halkaya
+   geçtiğinde halka aydınlanmıyor, soluk kalıyordu. Aydınlık hâli de
+   burada yazılı olmak zorunda. */
+.tahtaPanel .tahta .kare.dis { opacity: .62; }
+.tahtaPanel .tahta.disKulvarda .kare.dis { opacity: 1; }
+.tahtaPanel .tahta.disKulvarda .kare.ic { opacity: .62; }
+.tahtaPanel .tahta.disKulvarda .icZemin { opacity: .45; }
+
+/* Orta: maketteki gibi yeşil bir tepe. Zar onun ÜSTÜNDE duruyor. */
+.tahtaPanel .orta {
+  display: grid; justify-items: center; gap: 6px;
+}
+.tahtaPanel .zarDugme {
+  /* Banknot yeşili: tahtanın paletiyle aynı yeşil. */
+  background: linear-gradient(180deg, var(--t-banknotAc) 0%, var(--t-banknot) 100%);
+  border: 1px solid #1C5537;
+  color: #fff; font-weight: 800; letter-spacing: .06em;
+  padding: 14px 30px; border-radius: 999px;
+  box-shadow:
+    0 4px 0 #17603a,
+    0 10px 20px rgba(0, 0, 0, .35),
+    inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+.tahtaPanel .zarDugme:disabled {
+  background: linear-gradient(180deg, #7f8f86 0%, #63736b 100%);
+  border-color: #4f5b55; box-shadow: 0 3px 0 #4f5b55;
+}
+.tahtaPanel .siraMetni { color: #9FAAA1; font-size: 11.5px; }
+.tahtaPanel .zar {
+  background: #fff; border-color: #d7d2c6;
+  box-shadow: 0 3px 0 rgba(10,30,40,.35), 0 8px 14px rgba(0,0,0,.3);
+}
+
+
+/* ---------- eylem satırı ---------- */
+/* Maketteki renkli düğme şeridi. Renk sadece süs değil, ayırt edici:
+   üç ekran üç renk, oyuncu ikinci kez bakmadan buluyor. */
+.eylemler {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 10px; margin-bottom: 14px;
+}
+/* EYLEM DÜĞMELERİ. Mor, mavi ve altın dolgulardı; üçü de birbiriyle
+   ve tahtayla kavga ediyordu. Üç ayrı renk, üç ayrı önem demek —
+   oysa üçü de eşit. Şimdi üçü aynı: mürekkep yüzey, pirinç ikon.
+   Fark renkte değil ikonda, ki fark olması gereken yer orası.
+   İKON EMOJİ DEĞİL ÇİZGİ: emoji her telefonda başka çiziliyor ve üçü
+   bir arada üç ayrı çizim dili oluyordu. */
+.eylem {
+  display: grid; justify-items: center; gap: 6px;
+  padding: 11px 6px; border-radius: 14px; cursor: pointer;
+  font-size: 10.5px; font-weight: 600; letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--t-metin);
+  background: var(--t-yuzey); border: 1px solid var(--t-cizgi);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .35), 0 6px 14px rgba(0, 0, 0, .3);
+}
+.eylem svg {
+  width: 18px; height: 18px; stroke: var(--t-pirinc);
+  fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+}
+.eylem:hover { border-color: rgba(200, 164, 77, .45); }
+.eylem:active { transform: translateY(2px); box-shadow: 0 0 0 rgba(0,0,0,.35); }
+
+/* ---------- seçim ekranı da aynı dilde ---------- */
+.secim { max-width: 560px; padding: 22px 12px 96px; }
+.secimBaslik { font-size: 26px; }
+.secKart { border-radius: 18px; }
+.secimAyak {
+  background: linear-gradient(180deg, rgba(242,237,227,0), var(--zemin) 30%);
+}
+
+/* ---------- modallar ---------- */
+.modal { border-radius: 22px; }
+.dugme {
+  border-radius: 14px; font-weight: 800; letter-spacing: .03em;
+}
+
+.istatistik { position: relative; }
+.trend { font-size: 15px; line-height: 1; flex: none; }
+.trend.iyiTrend { color: var(--aksan); }
+.trend.kotuTrend { color: var(--kayip); }
+
+/* ---------- hayal SEÇİM kartının canlı başlığı ---------- */
+/* SINIF ADLARI AYRI: ilk hâlinde .hayalUst / .hayalAd kullanmıştım ve
+   o adlar oyun ekranındaki kimlik bloğunda ZATEN kullanılıyordu
+   (index.html). Sonradan gelen kurallar onları ezdi: oyun sayfasının
+   üstünde tam genişlikte, 288 piksellik siyah bir bant belirdi —
+   .hayalUst konumlandırılmamış bir kapsayıcının içinde olduğu için
+   ekrana yapıştı. */
+/* Görselin üstünde basılı bir başlık ve fiyat var; fiyat içerikte
+   değişebildiği için onu okumak yerine ÖRTÜYORUZ. Şerit fotoğrafın
+   kendi karartmasını taklit ediyor, yazı veriden geliyor. */
+.secKart.hayal { position: relative; }
+.kartUstSerit {
+  position: absolute; top: 0; left: 0; right: 0;
+  padding: 7px 9px 10px;
+  text-align: left; line-height: 1.15;
+  /* Basılı başlık kartın üst ~%30'unu kaplıyor; şerit oraya kadar TAM
+     opak olmak zorunda, yoksa iki fiyat üst üste okunuyor — ilk
+     denemede tam olarak o oldu. Son parça yumuşasın diye kısa bir
+     geçiş bırakıldı. */
+  /* ESKİDEN KARTIN ÜST %40'INI KAPLAYAN OPAK SİYAH BİR SLABDI, çünkü
+     kaynak görsellerde başlık ve fiyat BASILIYDI ve şeridin onları
+     tamamen örtmesi gerekiyordu. Telefonda bu, her hayal kartının
+     üstünde kocaman siyah bir bant demekti — oyuncunun ilk şikâyeti de
+     buydu.
+     Basılı başlık artık kaynak görsellerin kendisinden kırpıldı, yani
+     örtecek bir şey kalmadı. Şerit yalnızca kendi yazısının okunmasını
+     sağlayan kısa bir gölge. */
+  background: linear-gradient(180deg,
+    rgba(12, 16, 24, .78) 0%,
+    rgba(12, 16, 24, .55) 62%,
+    rgba(12, 16, 24, 0) 100%);
+}
+.kartUstAd {
+  font-size: 12px; font-weight: 700; color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+}
+.kartUstKat {
+  margin-top: 2px; font-size: 11px; font-weight: 600;
+  color: #ffd970; font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   TELEFON KATMANI
+   ============================================================
+   Oyun zaten tek sütuna düşüyordu; burada eksik olan üç şey var:
+   çentik/ana çubuk payı, parmağa göre dokunma hedefi ve modalde
+   karar düğmelerine ulaşmak. Masaüstünü bozmamak için hepsi
+   dar ekran sorgusunun ya da env() değerlerinin arkasında.        */
+
+/* Çift dokunuşla istemsiz yakınlaşmayı kapatıyor ama iki parmakla
+   büyütmeyi bırakıyor: yakınlaştırmayı tamamen kapatmak gözü zayıf
+   oyuncuyu oyundan atmak olurdu. */
+button, .secKart, .sehirKart, .tas { touch-action: manipulation; }
+
+/* Dokunulan yerin mavi parlaması ve metin seçimi, tahtada zar atarken
+   oyunu kağıt gibi değil form gibi hissettiriyordu. */
+button, .tas, .secGorsel { -webkit-tap-highlight-color: transparent; }
+.tahta, .secimUst, .panelUst { -webkit-user-select: none; user-select: none; }
+
+@media (max-width: 560px) {
+  /* SEÇİM KARTLARI İKİ SÜTUN. Tek sütunda bir kart ekranın neredeyse
+     tamamını kaplıyordu: yirmi mesleği görmek için uzun uzun kaydırmak
+     gerekiyor, üstelik fotoğraf o boyutta kolajdan kalan kusurları da
+     büyütüyordu. */
+  .secimListe.gorselKartlar { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .secKart { max-width: none; }
+  .secKart .altYazi { padding: 7px 8px 9px; font-size: 11px; line-height: 1.4; }
+  .kartUstAd { font-size: 11px; }
+  .kartUstKat { font-size: 11px; }
+  .hayalUzak { font-size: 10px; padding: 6px 8px 0; }
+  .hayalOlcek { font-size: 10px; padding: 0 8px 8px; }
+
+  /* Geniş kart (kolajda tek başına satır kaplayan) iki sütunda da
+     satırın tamamını alıyor — zaten grid-column: 1 / -1. */
+
+  /* ÖZET RAKAMLARI. Bu kurallar '.istatistik' bir YUVARLAK KUTU olduğu
+     zamandan kalmıştı; cetvele geçince telefonda onu sessizce eziyordu:
+     etiketi 8,5 puntoya düşürüp satır adımını 39 piksele şişiriyorlardı.
+     Ölçtüm, yoksa masaüstünde doğru görünüp telefonda yanlış kalacaktı —
+     bu dosyada aynı tuzağa ikinci düşüşüm.
+     AYNI SINIF ADLARINI BİR KEZ DE YANLIŞ YAZMIŞTIM ('.kutu'), kurallar
+     hiçbir şey yapmamıştı. Sınıf adı değişince buraya da bakılacak. */
+  .dortlu { gap: 0; margin: 10px 0 6px; }
+  .istatistik { padding: 3px 0; gap: 9px; border-radius: 0; }
+  .istatistik b { font-size: 15.5px; }
+  .istatistik .etiket { font-size: 13px; }
+  /* '.buyukOran' TEK BAŞINA YETMİYOR: '.yarisUst b' (özgüllük 0,1,1)
+     onu eziyor ve rakam 26px'te kalıyordu. Ölçmeseydim düzeldiğini
+     sanacaktım — bu dosyanın kendi notlarının uyardığı çakışma. */
+  .yarisUst .buyukOran { font-size: 22px; }
+  .yarisKart .kalan { font-size: 11px; }
+
+  /* Mali tablodaki ikili kutular (aynı ad, farklı ekran). */
+  .kutu { padding: 7px 9px; border-radius: 9px; }
+  .kutu b { font-size: 14px; }
+  .ikili { gap: 6px; margin-bottom: 6px; }
+  .ikili.ince .kutu b { font-size: 12.5px; }
+
+  /* Eylem düğmeleri de daralıyor ama 48px dokunma hedefinin altına
+     inmiyor. */
+  .eylemler { gap: 7px; margin-bottom: 10px; }
+  .eylem { padding: 11px 6px; font-size: 11px; border-radius: 13px; }
+  .eylem span { font-size: 13px; }
+  .panelBaslik { font-size: 12px; }
+
+  /* FIRSAT KARTLARI İKİ SÜTUN. Alt alta dizilince modal 700 pikseli
+     geçiyor ve iki teklifi KARŞILAŞTIRMAK için kaydırmak gerekiyordu —
+     oysa kararın tamamı karşılaştırmaktan ibaret. Yan yana konunca
+     yazı küçülüyor ama iki kart da aynı anda görünüyor. */
+  .kartlar.iki { grid-template-columns: 1fr 1fr; gap: 7px; }
+  .kartlar.iki .kart { padding: 9px 8px; }
+  .kartlar.iki .kart .b { font-size: 13px; margin: 2px 0 4px; }
+  .kartlar.iki .kart .sat { font-size: 11px; }
+  .kartlar.iki .kart .etiket { font-size: 9px; }
+  .kartlar.iki .kart .a,
+  .kartlar.iki .kart .risk,
+  .kartlar.iki .kart .capa { font-size: 10px; line-height: 1.35; }
+  .kartlar.iki .dugme { font-size: 11px; padding: 10px 6px; }
+
+  /* ÇENTİK VE ANA ÇUBUK PAYI. Sabit ayak çubuğu iPhone'da ana çubuğun
+     altında kalıyordu: DEVAM düğmesinin alt yarısı tıklanamıyordu. */
+  .secimAyak {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    padding-left: calc(12px + env(safe-area-inset-left));
+    padding-right: calc(12px + env(safe-area-inset-right));
+  }
+  body { padding-bottom: env(safe-area-inset-bottom); }
+
+  /* Parmak hedefi. 44px, dokunmatikte okunan en küçük güvenli ölçü. */
+  .dugme, .eylem { min-height: 48px; }
+  .secimAyak .ikincil { max-width: 96px; }
+
+  /* MODALDE KARAR ÇUBUĞU YAPIŞIK. Fırsat modali telefonda 700px'i
+     geçiyor; oyuncu iki kartı da geçip aşağı inmeden "geç" ya da
+     "kredi" düğmesine ulaşamıyordu. Kartların kendi AL düğmeleri
+     yerinde duruyor, yalnızca ortak kararlar altta sabitlendi. */
+  .modal { max-height: 92vh; padding: 14px; }
+  .modal .modalAyak {
+    position: sticky; bottom: calc(-14px + env(safe-area-inset-bottom));
+    margin: 12px -14px calc(-14px - env(safe-area-inset-bottom));
+    /* Üstteki geniş pay bir PERDE: altından geçen kart yazısı çubuğun
+       içinden sızıyordu ve ekran hatalı görünüyordu. Dar bir geçişle
+       olmuyor, opak kısmın erken başlaması gerekiyor. */
+    padding: 26px 14px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg,
+      rgba(255, 253, 248, 0) 0%,
+      rgba(255, 253, 248, .86) 34%,
+      var(--yuzey) 62%);
+    display: flex; gap: 8px;
+  }
+  .modal .modalAyak .dugme { margin-top: 0; flex: 1; }
+
+  /* Lastik bant kaydırması modalin arkasındaki sayfayı oynatıyordu. */
+  .ortu { overscroll-behavior: contain; }
+
+  /* Şehir kartları zaten tek sütuna düşüyor; yazıyı biraz büyüt. */
+  .sehirAnlatim { font-size: 13px; }
+  .sehirTablo .sat { font-size: 13px; }
+}
+
+/* Ana ekrana eklenip tam ekran açıldığında üstte durum çubuğu payı
+   kalıyor: başlık çentiğin altından başlasın. */
+@media (display-mode: standalone) {
+  .secimUst, .tahtaPanel { padding-top: calc(12px + env(safe-area-inset-top)); }
+}
+
+
+/* ---------- dil düğmesi ---------- */
+/* Seçim ekranının sağ üstünde, küçük ve sessiz: oyuncunun bir kez
+   dokunup bir daha düşünmeyeceği bir ayar. Başlığın akışını bozmasın
+   diye konumlandırılmış; secimUst zaten hizalamayı yapıyor. */
+.secimUst { position: relative; }
+
+.dilDugme {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  color: var(--sonuk);
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  cursor: pointer;
+  opacity: 0.65;
+}
+
+.dilDugme:hover,
+.dilDugme:focus-visible { opacity: 1; }
+
+/* Geri bildirim kutusu: oyun sonunda tek soru, tek kutu.
+   .formGiris'i paylaşıyor; farkı yalnızca çok satırlı olması ve
+   köşesinden büyütülebilmesi. */
+.geriKutu {
+  resize: vertical; min-height: 66px; line-height: 1.45;
+  font-variant-numeric: normal;   /* serbest metin, rakam sütunu değil */
+  margin-bottom: 9px;
+}
+
+/* Gizlilik bağlantısı: listenin altında, eylem çubuğunun üstünde.
+   Bilerek sönük — oyuncunun aradığı şey değil, ama arayınca bulunmalı. */
+.secimDip {
+  text-align: center; padding: 6px 0 14px;
+  font-size: 12.5px;
+}
+.secimDip a { color: var(--sonuk); text-decoration: none; }
+.secimDip a:hover { color: var(--metin); text-decoration: underline; }

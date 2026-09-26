@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gizlilik — Rich Routine</title>
+<meta name="description" content="Rich Routine hiçbir veri toplamıyor. Ne topladığı, neyi toplamadığı ve nasıl sileceğin." />
+<!-- OYUNUN KENDİSİNDEN AYRI, DÜZ BİR SAYFA.
+     Sebep: gizlilik politikası, uygulamanın çalışmadığı durumda da
+     okunabilmeli. 44 MB'lık bir WASM motorunun arkasına koymak,
+     "motor yüklenemedi" diyen bir ekranda politikayı da yok etmek
+     olurdu. Bu dosya tek başına, 6 KB ve çerçevesiz. -->
+<style>
+  :root {
+    --zemin: #f2ede3; --yuzey: #fffdf8; --cizgi: #d8cfbe;
+    --metin: #2a241c; --sonuk: #6d6355; --aksan: #1e7d47;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-tema="acik"]) {
+      --zemin: #16211c; --yuzey: #1b2620; --cizgi: rgba(237,231,217,.14);
+      --metin: #e4ded0; --sonuk: #8e9a91; --aksan: #5fb98a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 16px 64px; background: var(--zemin);
+    color: var(--metin); line-height: 1.62;
+    font: 16px/1.62 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 620px; margin: 0 auto; }
+  h1 { font-size: 26px; line-height: 1.25; margin: 0 0 6px; }
+  h2 { font-size: 15px; letter-spacing: .04em; text-transform: uppercase;
+       margin: 34px 0 8px; color: var(--sonuk); }
+  .ust { color: var(--sonuk); font-size: 14px; margin: 0 0 26px; }
+  .kutu { background: var(--yuzey); border: 1px solid var(--cizgi);
+          border-radius: 12px; padding: 16px 18px; margin: 18px 0; }
+  .vurgu { font-size: 18px; font-weight: 700; color: var(--aksan); margin: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 4px; }
+  th, td { text-align: left; padding: 8px 10px 8px 0; font-size: 14.5px;
+           border-bottom: 1px solid var(--cizgi); vertical-align: top; }
+  th { color: var(--sonuk); font-weight: 600; white-space: nowrap; }
+  code { font: 13.5px ui-monospace, SFMono-Regular, Menlo, monospace;
+         background: var(--yuzey); border: 1px solid var(--cizgi);
+         border-radius: 5px; padding: 1px 5px; }
+  a { color: var(--aksan); }
+  hr { border: 0; border-top: 1px solid var(--cizgi); margin: 46px 0 34px; }
+  .geri { display: inline-block; margin-top: 30px; font-size: 15px; }
+  ul { padding-left: 20px; } li { margin-bottom: 5px; }
+</style>
+</head>
+<body>
+<main>
+
+<section lang="tr">
+
+<h1>Gizlilik</h1>
+<p class="ust">Rich Routine · son güncelleme 24 Eylül 2026</p>
+
+<div class="kutu">
+  <p class="vurgu">Hiçbir veriniz bize ulaşmıyor.</p>
+  <p style="margin:8px 0 0">Hesap yok, giriş yok, çerez yok, reklam yok,
+  izleme betiği yok. Oyun tarayıcınızda çalışıyor ve orada kalıyor.</p>
+</div>
+
+<h2>Cihazınızda ne duruyor</h2>
+<p>Oyun tarayıcınızın yerel deposuna yalnızca iki şey yazıyor:</p>
+<table>
+  <tr><th><code>rr-dil</code></th>
+      <td>Seçtiğiniz dil (<code>tr</code> ya da <code>en</code>), bir
+      sonraki açılışta hatırlamak için.</td></tr>
+  <tr><th><code>rr-olcum</code></th>
+      <td>Kaç oyun açıldığı ve kaçıncı turda bırakıldığı gibi
+      <strong>isimsiz sayaçlar</strong>. Kim olduğunuzu gösteren hiçbir
+      şey içermiyor: kimlik yok, tarihçe yok, para yok.</td></tr>
+</table>
+<p>Bu ikisi cihazınızdan çıkmıyor. Sayaçları
+<a href="./?olcum">?olcum</a> adresinden görebilir,
+<a href="./?olcum=sil">?olcum=sil</a> ile silebilirsiniz.</p>
+
+<h2>“Kendi hayatım” formu</h2>
+<p>Oyun size kendi maaşınızı, giderlerinizi ve borçlarınızı yazma imkânı
+veriyor. <strong>Yazdıklarınız hiçbir yere kaydedilmiyor</strong> — ne
+sunucuya gönderiliyor, ne de tarayıcınızda saklanıyor. Yalnızca o anki
+oyunu kurmak için kullanılıyor ve sekmeyi kapattığınızda kayboluyor.</p>
+
+<h2>Oyun sonundaki geri bildirim kutusu</h2>
+<p>Oyun bittiğinde çıkan “ne düşündün” kutusuna yazdığınız metin
+<strong>panonuza kopyalanıyor, hiçbir yere gönderilmiyor.</strong> Onu
+kime, nereden göndereceğinize siz karar veriyorsunuz. Göndermezseniz
+hiçbir yere gitmez.</p>
+
+<h2>Ölçümleme servisi</h2>
+<p>Oyunda üçüncü taraf bir ölçümleme servisi <strong>kurulu değil</strong>.
+İleride kurulursa bu sayfa güncellenecek ve giden veri yine yalnızca
+isimsiz sayaçlardan ibaret olacak: para ve serbest metin hiçbir koşulda
+gönderilmiyor.</p>
+
+<h2>Barındırma</h2>
+<p>Site GitHub Pages üzerinde duruyor. Her web sitesinde olduğu gibi,
+sayfayı açtığınızda GitHub’ın sunucuları bağlantı kaydı tutabilir (IP
+adresi, tarayıcı bilgisi). Bu kayıtlar bizim elimizde değil ve bizim
+erişimimize açık değil. GitHub’ın kendi gizlilik ilkeleri
+<a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement">burada</a>.</p>
+
+<h2>Çocuklar</h2>
+<p>Oyun kişisel veri toplamadığı için çocuklardan da veri toplamıyor.</p>
+
+<h2>İletişim</h2>
+<p>Soru ya da silme talebi için: <a href="mailto:cilesiz.atilla@gmail.com">cilesiz.atilla@gmail.com</a></p>
+
+<a class="geri" href="./">← Oyuna dön</a>
+
+</section>
+
+<hr />
+
+<section lang="en">
+
+<h1>Privacy</h1>
+<p class="ust">Rich Routine · last updated 24 September 2026</p>
+
+<div class="kutu">
+  <p class="vurgu">None of your data reaches us.</p>
+  <p style="margin:8px 0 0">No account, no sign-in, no cookies, no ads, no
+  tracking scripts. The game runs in your browser and stays there.</p>
+</div>
+
+<h2>What is stored on your device</h2>
+<table>
+  <tr><th><code>rr-dil</code></th>
+      <td>The language you chose, so it is remembered next time.</td></tr>
+  <tr><th><code>rr-olcum</code></th>
+      <td><strong>Anonymous counters</strong> — how many games were opened
+      and around which turn they were left. Nothing that identifies you:
+      no identifier, no history, no money.</td></tr>
+</table>
+<p>Neither leaves your device. You can view the counters at
+<a href="./?olcum">?olcum</a> and erase them at
+<a href="./?olcum=sil">?olcum=sil</a>.</p>
+
+<h2>The “my own life” form</h2>
+<p>The game lets you enter your real salary, costs and debts.
+<strong>What you type is never stored</strong> — not sent to a server, not
+kept in your browser. It is used only to set up that one game and is gone
+when you close the tab.</p>
+
+<h2>The feedback box</h2>
+<p>Whatever you write in the “what did you think” box at the end of a game
+is <strong>copied to your clipboard and sent nowhere.</strong> You decide
+who to send it to, and whether to send it at all.</p>
+
+<h2>Analytics</h2>
+<p>No third-party analytics service is installed. If one ever is, this page
+will be updated, and what leaves the device will still be anonymous counters
+only: money and free text are never transmitted.</p>
+
+<h2>Hosting</h2>
+<p>The site is hosted on GitHub Pages. As with any website, GitHub’s servers
+may keep connection logs (IP address, browser details). We do not hold those
+logs and cannot access them.</p>
+
+<h2>Contact</h2>
+<p><a href="mailto:cilesiz.atilla@gmail.com">cilesiz.atilla@gmail.com</a></p>
+
+<a class="geri" href="./">← Back to the game</a>
+
+</section>
+
+</main>
+</body>
+</html>

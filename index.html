@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <!-- user-scalable=no DEĞİL: yakınlaştırmayı kapatmak erişilebilirliği
+       kırıyor. Çift dokunuşla istemsiz yakınlaşmayı CSS'teki
+       touch-action: manipulation hallediyor; oyuncu isterse hâlâ
+       iki parmakla büyütebiliyor. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Rich Routine</title>
+
+  <!-- PAYLAŞIM ÖNİZLEMESİ.
+       Bu etiketler olmadan link WhatsApp'ta çıplak bir URL olarak
+       görünüyordu: başlıksız, görselsiz, açıklamasız — yani spam gibi.
+       Oyunun asıl dağıtım kanalı birinin bir başkasına link atması
+       olduğu için bu, eksik bir özellik değil dağıtım hatasıydı.
+
+       og:image MUTLAK adres olmak zorunda; göreli yol veren sayfalarda
+       önizleme sessizce görselsiz çıkıyor. -->
+  <meta name="description" content="Bakman gereken sayı maaş değil: maaştan geriye ne kaldığı. Ücretsiz, kayıt yok." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Rich Routine" />
+  <meta property="og:title" content="Rich Routine" />
+  <meta property="og:description" content="Bakman gereken sayı maaş değil: maaştan geriye ne kaldığı. Ücretsiz, kayıt yok." />
+  <meta property="og:url" content="https://cilesizatilla-ux.github.io/rich-routine/" />
+  <meta property="og:image" content="https://cilesizatilla-ux.github.io/rich-routine/ikon/paylasim.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale" content="tr_TR" />
+  <meta property="og:locale:alternate" content="en_US" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Rich Routine" />
+  <meta name="twitter:description" content="Bakman gereken sayı maaş değil: maaştan geriye ne kaldığı." />
+  <meta name="twitter:image" content="https://cilesizatilla-ux.github.io/rich-routine/ikon/paylasim.jpg" />
+
+  <!-- Telefona kurulabilmesi için. Android'de manifest + service worker
+       şart; iOS'ta apple-touch-icon ve apple-mobile-web-app-capable. -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#f2ede3" />
+  <link rel="apple-touch-icon" href="ikon/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Rich Routine" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <!-- AÇILIŞ EKRANI. Ana ekrandan açılınca iOS, uygulama yüklenene
+       kadar boş beyaz bir ekran gösteriyordu. Android manifest'teki
+       arkaplan rengiyle kendi açılışını çiziyor; iOS her cihaz
+       boyutu için AYRI bir görsel istiyor, o yüzden bu liste uzun. -->
+  <link rel="apple-touch-startup-image" href="acilis/1290x2796.png"
+        media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+  <link rel="apple-touch-startup-image" href="acilis/1179x2556.png"
+        media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+  <link rel="apple-touch-startup-image" href="acilis/1284x2778.png"
+        media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+  <link rel="apple-touch-startup-image" href="acilis/1170x2532.png"
+        media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+  <link rel="apple-touch-startup-image" href="acilis/1125x2436.png"
+        media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+  <link rel="apple-touch-startup-image" href="acilis/1242x2688.png"
+        media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+  <link rel="apple-touch-startup-image" href="acilis/828x1792.png"
+        media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+  <link rel="apple-touch-startup-image" href="acilis/750x1334.png"
+        media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+  <link rel="apple-touch-startup-image" href="acilis/640x1136.png"
+        media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+
+
+  <link rel="stylesheet" href="stil.css" />
+  <!-- ÖLÇÜM SERVİSİ — ÜÇÜNDEN BİRİNİ AÇ.
+       Ne gönderiliyor: yalnızca olay adı ve olcum.js'in beyaz
+       listesinden geçmiş alanlar. Oyuncunun GERÇEK maaşı ve borçları
+       hiçbir koşulda çıkmıyor; tool/olcum_denetimi.mjs bunu ağa giden
+       yolda, her derlemede sınıyor.
+
+       HİÇBİRİ AÇIK DEĞİLSE DIŞARI HİÇBİR ŞEY GİTMEZ. Ölçüm yine de
+       cihazda birikir ve ?olcum ile görülür. Bu bilinçli: bir servis
+       seçilmeden oyuncunun tarayıcısından üçüncü bir şirkete istek
+       gitmesi için sebep yok.
+
+       Kod hangisinin yüklü olduğuna bakıyor (olcum.js/yolla), yani
+       seçim burada başlayıp burada bitiyor.
+
+       1) UMAMI — ücretsiz (100k olay/ay, 3 site, kart istemiyor).
+          cloud.umami.is'te site ekle, data-website-id'yi yapıştır.
+       2) PLAUSIBLE — ayda ~$9. Site ekle, alan adı aşağıdaki gibi.
+       3) POSTHOG — ücretsiz (1M olay/ay), daha güçlü huni araçları.
+  -->
+
+  <!-- 1) UMAMI
+  <script defer src="https://cloud.umami.is/script.js"
+          data-website-id="BURAYA-UMAMI-SITE-ID"></script>
+  -->
+
+  <!-- 2) PLAUSIBLE
+  <script defer data-domain="cilesizatilla-ux.github.io"
+          src="https://plausible.io/js/script.js"></script>
+  <script>
+    window.plausible = window.plausible
+      || function () { (window.plausible.q = window.plausible.q || []).push(arguments); };
+  </script>
+  -->
+
+  <!-- 3) POSTHOG: posthog.com'daki snippet'i olduğu gibi buraya yapıştır. -->
+
+</head>
+<body>
+  <!-- AÇILIŞ EKRANI. iOS'un apple-touch-startup-image'ı YALNIZCA ana
+       ekrana kurulmuş uygulamada ve yalnızca ölçüsü tutan cihazda
+       çıkıyor; tarayıcıda açanda hiç çıkmıyor. Bu yüzden açılışı
+       uygulamanın kendisi de çiziyor — her açılışta, her yerde.
+       Boyalar acilis/*.png ile aynı (krem zemin, aynı işaret, aynı ad)
+       ki kurulu uygulamada sistem ekranından buna geçiş görünmesin.
+       İşaret SVG, çünkü dosya olsaydı açılış ekranı kendi görselini
+       beklerdi; böyle ilk karede basılıyor. -->
+  <div id="yukleniyor" class="yukleniyor">
+    <svg class="acilisIsaret" viewBox="0 0 512 512" aria-hidden="true">
+      <defs>
+        <radialGradient id="acZemin" cx="38%" cy="32%" r="82%">
+          <stop offset="0" stop-color="#3a332a"/><stop offset="1" stop-color="#17140f"/>
+        </radialGradient>
+        <radialGradient id="acYesil" cx="42%" cy="38%" r="70%">
+          <stop offset="0" stop-color="#2fa365"/><stop offset="1" stop-color="#1c7343"/>
+        </radialGradient>
+      </defs>
+      <rect width="512" height="512" rx="112" fill="url(#acZemin)"/>
+      <rect x="234.5" y="72.5" width="43" height="43" rx="11" fill="#d6c4a0"/>
+      <rect x="296.5" y="84.8" width="43" height="43" rx="11" fill="#f2ede3"/>
+      <rect x="349.1" y="119.9" width="43" height="43" rx="11" fill="#f2ede3"/>
+      <rect x="384.2" y="172.5" width="43" height="43" rx="11" fill="#f2ede3"/>
+      <rect x="396.5" y="234.5" width="43" height="43" rx="11" fill="#d6c4a0"/>
+      <rect x="384.2" y="296.5" width="43" height="43" rx="11" fill="#f2ede3"/>
+      <rect x="349.1" y="349.1" width="43" height="43" rx="11" fill="#f2ede3"/>
+      <rect x="296.5" y="384.2" width="43" height="43" rx="11" fill="#f2ede3"/>
+      <rect x="234.5" y="396.5" width="43" height="43" rx="11" fill="#d6c4a0"/>
+      <rect x="172.5" y="384.2" width="43" height="43" rx="11" fill="#f2ede3"/>
+      <rect x="119.9" y="349.1" width="43" height="43" rx="11" fill="#f2ede3"/>
+      <rect x="84.8" y="296.5" width="43" height="43" rx="11" fill="#f2ede3"/>
+      <rect x="72.5" y="234.5" width="43" height="43" rx="11" fill="#d6c4a0"/>
+      <rect x="84.8" y="172.5" width="43" height="43" rx="11" fill="#f2ede3"/>
+      <rect x="119.9" y="119.9" width="43" height="43" rx="11" fill="#f2ede3"/>
+      <rect x="172.5" y="84.8" width="43" height="43" rx="11" fill="#f2ede3"/>
+      <circle cx="256" cy="256" r="95" fill="url(#acYesil)"/>
+      <!-- Tahtada dönen taş: bekleme boyunca kare kare ilerliyor. -->
+      <circle class="acilisTas" cx="256" cy="94" r="15" fill="#2fa365"
+              stroke="#f2ede3" stroke-width="5"/>
+    </svg>
+    <div class="acilisAd">Rich Routine</div>
+    <div class="acilisDurum" data-dil="motor yükleniyor…">motor yükleniyor…</div>
+  </div>
+
+  <!-- AÇILIŞ YAZISI MOTORDAN ÖNCE ÇEVRİLİYOR ve bu yüzden burada.
+       Dil tablosu WASM'ın içinde; main.js onu ancak motor yüklendikten
+       sonra okuyabiliyor. Yani "motor yükleniyor…" yazısı — İngilizce
+       oynayanın gördüğü İLK şey — tam olarak çevrilemeyeceği anda
+       ekranda duruyor. Birkaç saniye, ama ilk izlenim o.
+
+       Tek dizge için tabloyu ikiye bölmek yerine o dizgenin kopyası
+       burada duruyor. Kopya olduğu için bayatlayabilir; bayatlarsa
+       görünür bir yerde bayatlar (açılış ekranı), sessiz bir yerde
+       değil. Dil seçimi main.js'teki dilSecimi() ile AYNI kuralı
+       kullanıyor: önce kalıcı tercih, sonra cihaz dili. -->
+  <script>
+    (function () {
+      var kod = null;
+      try { kod = localStorage.getItem('rr-dil'); } catch (e) { /* gizli sekme */ }
+      if (kod !== 'tr' && kod !== 'en') {
+        kod = (navigator.language || 'tr').slice(0, 2).toLowerCase() === 'tr'
+          ? 'tr' : 'en';
+      }
+      document.documentElement.lang = kod;
+      if (kod !== 'tr') {
+        var d = document.querySelector('.acilisDurum');
+        if (d) d.textContent = 'loading the engine…';
+      }
+    })();
+  </script>
+
+  <section id="secim" class="secim" hidden>
+    <div class="secimUst">
+      <button id="dilDugme" class="dilDugme" type="button"
+              aria-label="Dili değiştir">EN</button>
+      <div class="secimBaslik" id="secimBaslik" data-dil="Mesleğini seç">Mesleğini seç</div>
+      <div class="secimAlt" id="secimAlt">
+        Bakman gereken sayı maaş değil: maaştan geriye ne kaldığı.
+      </div>
+    </div>
+    <div id="secimListe" class="secimListe"></div>
+    <!-- GİZLİLİK BAĞLANTISI. Mağazaya yüklenmese bile gerekli: oyun
+         "Kendi hayatım" formunda gerçek maaş ve borç soruyor, ve
+         soran tarafın bunları ne yaptığını söylemesi gerekiyor.
+         Cevap kısa — hiçbir yere gitmiyor — ama yazılı olması şart. -->
+    <div class="secimDip">
+      <a href="gizlilik.html" data-dil="Gizlilik">Gizlilik</a>
+    </div>
+    <div class="secimAyak">
+      <button id="secimGeri" class="dugme ikincil" hidden data-dil="GERİ">GERİ</button>
+      <button id="secimIleri" class="dugme" disabled data-dil="DEVAM">DEVAM</button>
+    </div>
+  </section>
+
+  <main id="oyun" hidden>
+    <!-- TAHTA PANELİ. Oyuncunun kimliği ve tahta AYNI yüzeyde: kim
+         olduğu ve nerede durduğu tek bakışta okunsun. -->
+    <section class="tahtaPanel">
+      <header class="panelUst">
+        <!-- AVATAR: fotograf VARSA fotograf, yoksa mesleğin baş harfi.
+             Eskiden meslek kartının kendisiydi ve 44 pikselde kartın
+             Türkçe açıklamasının ortasından bir parça gösteriyordu. -->
+        <div id="oyuncuAvatar" class="avatar" aria-hidden="true"></div>
+        <div class="panelKimlik">
+          <div id="meslegim" class="panelMeslek"></div>
+          <div id="hayalim" class="panelHayal"></div>
+        </div>
+        <div class="turRozet">
+          <span class="turEtiket" data-dil="TUR">TUR</span>
+          <span id="tur" class="turSayi">0</span>
+        </div>
+        <button id="yeni" class="yuvarlakDugme" data-dil-baslik="Yeniden başlat"
+                title="Yeniden başlat">
+          <span class="ikon">↻</span><span class="alt" data-dil="yeniden">yeniden</span>
+        </button>
+      </header>
+
+      <div class="tahtaKap">
+        <div id="tahta" class="tahta"></div>
+        <div class="orta">
+          <div id="zarlar" class="zarlar"></div>
+          <button id="zarAt" class="zarDugme" data-dil="ZAR AT">ZAR AT</button>
+          <div id="siraMetni" class="siraMetni">…</div>
+        </div>
+      </div>
+      <div id="hayat" class="panelHayat"></div>
+    </section>
+
+    <div id="turNotu" class="turNotu" hidden></div>
+
+    <!-- Eylem satırı. Makette beş düğme var ama üçünün (Raporlar,
+         Hedefler, Ayarlar) arkasında bir ekran yok; olmayan bir şeye
+         düğme koymak oyuncuya yalan söylemek olurdu. -->
+    <div class="eylemler">
+      <button id="banka" class="eylem">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg>
+        <span data-dil="Banka">Banka</span>
+      </button>
+      <button id="bilanco" class="eylem">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+        <span data-dil="Mali tablo">Mali tablo</span>
+      </button>
+      <button id="portfoy" class="eylem">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v13H3zM8 7V4h8v3"/></svg>
+        <span data-dil="Portföy">Portföy</span>
+      </button>
+    </div>
+
+    <!-- YARIŞ KARTI. Oyuncunun her turda sorduğu soru: pasif gelirim
+         gideri karşılamaya ne kadar yaklaştı. -->
+    <section class="kart yarisKart">
+      <div class="yarisUst">
+        <span class="etiket" id="karsilamaEtiket" data-dil="KARŞILAMA">KARŞILAMA</span>
+        <b id="karsilamaMetni" class="buyukOran">%0</b>
+      </div>
+      <div class="cubuk"><div id="dolgu" class="dolgu"></div></div>
+      <div id="kalan" class="kalan"></div>
+
+      <!-- DEFTER SATIRI. Dört yuvarlak kutuydu ve ekranın yarısını
+           yiyordu. Satırda sıra: etiket, noktalı kılavuz çizgi, rakam,
+           yön oku. Sarmalayıcı <div> kalktı — etiket ve rakamın AYRI
+           ızgara hücreleri olması gerekiyor, yoksa rakamlar alt alta
+           hizalanmıyor ve cetvel olmuyor. -->
+      <div class="dortlu">
+        <div class="istatistik iyi">
+          <span class="etiket" data-dil="Pasif gelir">Pasif gelir</span>
+          <i class="defKilavuz"></i>
+          <b id="pasif">—</b>
+          <span id="okPasif" class="trend"></span>
+        </div>
+        <div class="istatistik kotu">
+          <span class="etiket" data-dil="Aylık gider">Aylık gider</span>
+          <i class="defKilavuz"></i>
+          <b id="gider">—</b>
+          <span id="okGider" class="trend"></span>
+        </div>
+        <div class="istatistik">
+          <span class="etiket" data-dil="Nakit">Nakit</span>
+          <i class="defKilavuz"></i>
+          <b id="nakit">—</b>
+          <span id="okNakit" class="trend"></span>
+        </div>
+        <div class="istatistik">
+          <span class="etiket" data-dil="Aylık akış">Aylık akış</span>
+          <i class="defKilavuz"></i>
+          <b id="akis">—</b>
+          <span id="okAkis" class="trend"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- HAYAL KARTI. Ne için oynadığı ve hedefin ne olduğu. -->
+    <section class="kart hayalKart">
+      <img id="hayalBanner" class="hayalBanner" alt="">
+      <div class="hayalGovde">
+        <div class="hayalUst">
+          <div>
+            <div id="hayalAd" class="hayalAd"></div>
+            <div id="hedefCumlesi" class="hedefCumlesi"></div>
+          </div>
+        </div>
+        <div class="hedefKutu">
+          <span class="etiket" data-dil="HEDEFE ULAŞMA DURUMU">HEDEFE ULAŞMA DURUMU</span>
+          <div class="cubuk ince"><div id="hedefDolgu" class="dolgu"></div></div>
+          <b id="hedefOran">%0</b>
+        </div>
+
+        <!-- HEDEFE YAKLAŞTIKÇA BELİREN CÜMLE. Hayale özel; %25'in
+             altında hiç yok, çünkü orada söylenecek dürüst bir şey de
+             yok. Metni motor seçiyor, burası yalnızca gösteriyor. -->
+        <div id="hayalSozu" class="hayalSozu" hidden></div>
+      </div>
+    </section>
+
+    <!-- ALT PANELLER. Uydurma ekran yok: ikisi de gerçek veriden
+         besleniyor ve tıklanınca ilgili ekranı açıyor. -->
+    <div class="paneller">
+      <section class="kart panel">
+        <div class="panelBaslik">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v13H3zM8 7V4h8v3"/></svg>
+          <span data-dil="Yatırımlarım">Yatırımlarım</span>
+        </div>
+        <div id="varlikListesi" class="panelListe"></div>
+      </section>
+      <section class="kart panel">
+        <div class="panelBaslik">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg>
+          <span data-dil="Borçlarım">Borçlarım</span>
+        </div>
+        <div id="borcListesi" class="panelListe"></div>
+      </section>
+    </div>
+  </main>
+
+  <div id="ortu" class="ortu" hidden>
+    <div id="modal" class="modal"></div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+  <script>
+    // Service worker YALNIZCA güvenli kaynakta: file:// ile açıldığında
+    // ya da http üzerinden (localhost hariç) kayıt zaten reddedilir ve
+    // konsola gereksiz hata basar.
+    if ('serviceWorker' in navigator && window.isSecureContext) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {
+          // Çevrimdışı katmanı olmadan da oyun çalışıyor; sessiz geç.
+        });
+      });
+    }
+  </script>
+</body>
+</html>
